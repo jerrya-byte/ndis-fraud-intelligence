@@ -1,0 +1,2110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NDIS Fraud Intelligence Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+
+<style>
+  :root {
+    --bg-base: #0a0d12;
+    --bg-panel: #0f1420;
+    --bg-card: #141a28;
+    --bg-hover: #1a2235;
+    --border: #1e2d45;
+    --border-bright: #2a3f5f;
+    --accent-blue: #1e90ff;
+    --accent-amber: #f59e0b;
+    --accent-red: #ef4444;
+    --accent-green: #22c55e;
+    --accent-purple: #a855f7;
+    --text-primary: #e2e8f0;
+    --text-secondary: #8899aa;
+    --text-muted: #4a5568;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+    --risk-critical: #ef4444;
+    --risk-high: #f97316;
+    --risk-medium: #f59e0b;
+    --risk-low: #22c55e;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg-base);
+    color: var(--text-primary);
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.025) 2px, rgba(0,0,0,0.025) 4px);
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* ===== HEADER ===== */
+  .header {
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 500;
+  }
+
+  .header-left { display: flex; align-items: center; gap: 14px; }
+
+  .logo-mark {
+    width: 30px; height: 30px;
+    background: linear-gradient(135deg, var(--accent-blue), #0055cc);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 13px; font-weight: 600; color: white;
+  }
+
+  .header-title { font-family: var(--mono); font-size: 14px; font-weight: 600; letter-spacing: 0.02em; }
+  .header-subtitle { font-size: 10px; color: var(--text-muted); font-family: var(--mono); letter-spacing: 0.05em; text-transform: uppercase; }
+
+  .header-right { display: flex; align-items: center; gap: 16px; }
+
+  .data-source-badge {
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-family: var(--mono); font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+
+  .data-source-badge.mock {
+    background: rgba(245,158,11,0.1);
+    border: 1px solid rgba(245,158,11,0.3);
+    color: var(--accent-amber);
+  }
+
+  .data-source-badge.live {
+    background: rgba(34,197,94,0.1);
+    border: 1px solid rgba(34,197,94,0.3);
+    color: var(--accent-green);
+  }
+
+  .live-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    animation: pulse-dot 2s infinite;
+  }
+
+  .mock .live-dot { background: var(--accent-amber); }
+  .live .live-dot { background: var(--accent-green); }
+
+  @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  .last-updated { font-family: var(--mono); font-size: 10px; color: var(--text-muted); }
+
+  /* ===== TAB NAV ===== */
+  .tab-nav {
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    display: flex;
+    gap: 0;
+  }
+
+  .tab-btn {
+    padding: 10px 20px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: -1px;
+  }
+
+  .tab-btn:hover { color: var(--text-secondary); }
+
+  .tab-btn.active {
+    color: var(--accent-blue);
+    border-bottom-color: var(--accent-blue);
+  }
+
+  /* ===== CONTROLS BAR ===== */
+  .controls-bar {
+    background: rgba(15,20,32,0.95);
+    border-bottom: 1px solid var(--border);
+    padding: 8px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    position: sticky;
+    top: 56px;
+    z-index: 400;
+  }
+
+  .control-group { display: flex; align-items: center; gap: 7px; }
+  .control-label { font-size: 10px; font-family: var(--mono); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; }
+
+  select, input[type="range"], input[type="text"], input[type="number"] {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    font-family: var(--mono);
+    font-size: 12px;
+    border-radius: 4px;
+    padding: 4px 8px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  select:focus, select:hover,
+  input[type="text"]:focus, input[type="number"]:focus { border-color: var(--accent-blue); }
+
+  input[type="range"] { padding: 0; width: 100px; accent-color: var(--accent-blue); cursor: pointer; }
+
+  .range-value { font-family: var(--mono); font-size: 11px; color: var(--accent-blue); min-width: 26px; }
+
+  .filter-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: rgba(30,144,255,0.08);
+    border: 1px solid rgba(30,144,255,0.25);
+    color: var(--accent-blue);
+    border-radius: 20px;
+    padding: 3px 10px;
+    font-size: 10px; font-family: var(--mono);
+    cursor: pointer; transition: all 0.2s;
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+
+  .filter-chip.active { background: rgba(30,144,255,0.2); border-color: var(--accent-blue); }
+  .filter-chip:hover { opacity: 0.8; }
+
+  /* ===== TAB PANELS ===== */
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* ===== MAIN PADDING ===== */
+  .main { padding: 18px 24px; max-width: 1600px; margin: 0 auto; }
+
+  /* ===== KPI CARDS ===== */
+  .kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 16px; }
+
+  .kpi-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    position: relative; overflow: hidden;
+    transition: border-color 0.2s, transform 0.2s;
+    cursor: default;
+  }
+
+  .kpi-card:hover { border-color: var(--border-bright); transform: translateY(-1px); }
+
+  .kpi-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; }
+  .kpi-card.blue::before { background: var(--accent-blue); }
+  .kpi-card.red::before { background: var(--risk-critical); }
+  .kpi-card.amber::before { background: var(--accent-amber); }
+  .kpi-card.green::before { background: var(--accent-green); }
+  .kpi-card.purple::before { background: var(--accent-purple); }
+
+  .kpi-label { font-size: 10px; font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-muted); margin-bottom: 6px; }
+  .kpi-value { font-family: var(--mono); font-size: 26px; font-weight: 600; line-height: 1; margin-bottom: 5px; }
+  .kpi-card.blue .kpi-value { color: var(--accent-blue); }
+  .kpi-card.red .kpi-value { color: var(--risk-critical); }
+  .kpi-card.amber .kpi-value { color: var(--accent-amber); }
+  .kpi-card.green .kpi-value { color: var(--accent-green); }
+  .kpi-card.purple .kpi-value { color: var(--accent-purple); }
+  .kpi-change { font-size: 10px; font-family: var(--mono); color: var(--text-muted); }
+  .kpi-change.up { color: var(--risk-critical); }
+  .kpi-change.down { color: var(--accent-green); }
+
+  /* ===== PANELS ===== */
+  .panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+
+  .panel-header {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    background: rgba(255,255,255,0.01);
+  }
+
+  .panel-title {
+    font-family: var(--mono); font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-secondary);
+    display: flex; align-items: center; gap: 7px;
+  }
+
+  .ptd { width: 5px; height: 5px; border-radius: 50%; }
+  .ptd.blue { background: var(--accent-blue); }
+  .ptd.red { background: var(--risk-critical); }
+  .ptd.amber { background: var(--accent-amber); }
+  .ptd.green { background: var(--accent-green); }
+  .ptd.purple { background: var(--accent-purple); }
+
+  .panel-badge {
+    font-family: var(--mono); font-size: 10px;
+    padding: 2px 7px; border-radius: 10px;
+    background: rgba(239,68,68,0.12); color: var(--risk-critical);
+    border: 1px solid rgba(239,68,68,0.25);
+  }
+
+  .panel-body { padding: 14px; }
+
+  .chart-wrap { position: relative; height: 210px; }
+
+  /* ===== DASHBOARD GRIDS ===== */
+  .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+  .g-2-1 { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; margin-bottom: 14px; }
+  .g-1-1-auto { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+
+  /* ===== TABLE ===== */
+  .data-table { width: 100%; border-collapse: collapse; }
+  .data-table th {
+    font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em;
+    color: var(--text-muted); padding: 8px 12px; text-align: left;
+    border-bottom: 1px solid var(--border); white-space: nowrap;
+  }
+  .data-table td { padding: 8px 12px; font-size: 12px; border-bottom: 1px solid rgba(30,45,69,0.5); vertical-align: middle; }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:hover td { background: var(--bg-hover); }
+
+  .abn-text { font-family: var(--mono); font-size: 11px; color: var(--text-secondary); letter-spacing: 0.04em; }
+  .provider-name { font-weight: 500; max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .risk-badge {
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 2px 7px; border-radius: 3px;
+    font-family: var(--mono); font-size: 10px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap;
+  }
+  .risk-badge.critical { background: rgba(239,68,68,0.12); color: var(--risk-critical); border: 1px solid rgba(239,68,68,0.25); }
+  .risk-badge.high { background: rgba(249,115,22,0.12); color: var(--risk-high); border: 1px solid rgba(249,115,22,0.25); }
+  .risk-badge.medium { background: rgba(245,158,11,0.12); color: var(--risk-medium); border: 1px solid rgba(245,158,11,0.25); }
+  .risk-badge.low { background: rgba(34,197,94,0.12); color: var(--risk-low); border: 1px solid rgba(34,197,94,0.25); }
+
+  .flag { font-size: 10px; padding: 1px 5px; border-radius: 2px; font-family: var(--mono); white-space: nowrap; }
+  .flag.dup-contact { background: rgba(168,85,247,0.12); color: var(--accent-purple); border: 1px solid rgba(168,85,247,0.2); }
+  .flag.reregistered { background: rgba(239,68,68,0.1); color: var(--risk-critical); border: 1px solid rgba(239,68,68,0.2); }
+  .flag.density { background: rgba(245,158,11,0.1); color: var(--accent-amber); border: 1px solid rgba(245,158,11,0.2); }
+  .flag.abn-change { background: rgba(249,115,22,0.1); color: var(--risk-high); border: 1px solid rgba(249,115,22,0.2); }
+  .flag.no-service { background: rgba(30,144,255,0.1); color: var(--accent-blue); border: 1px solid rgba(30,144,255,0.2); }
+  .flag-row { display: flex; gap: 3px; flex-wrap: wrap; }
+
+  .score-wrap { display: flex; align-items: center; gap: 7px; }
+  .score-bar { height: 4px; border-radius: 2px; background: var(--border); flex: 1; min-width: 50px; overflow: hidden; }
+  .score-fill { height: 100%; border-radius: 2px; }
+  .score-num { font-family: var(--mono); font-size: 11px; min-width: 22px; text-align: right; }
+
+  /* ===== SUBURB LIST ===== */
+  .suburb-row {
+    display: flex; align-items: center; padding: 7px 14px;
+    border-bottom: 1px solid rgba(30,45,69,0.5); gap: 10px;
+    transition: background 0.15s; cursor: default;
+  }
+  .suburb-row:hover { background: var(--bg-hover); }
+  .suburb-row:last-child { border-bottom: none; }
+  .suburb-name { font-weight: 500; min-width: 105px; font-size: 12px; }
+  .suburb-state { font-family: var(--mono); font-size: 10px; color: var(--text-muted); min-width: 26px; }
+  .density-wrap { flex: 1; display: flex; align-items: center; gap: 8px; }
+  .density-bar { flex: 1; height: 5px; border-radius: 3px; background: var(--border); position: relative; overflow: visible; }
+  .density-fill { height: 100%; border-radius: 3px; }
+  .density-expected { position: absolute; top: -3px; width: 2px; height: 11px; background: rgba(255,255,255,0.25); border-radius: 1px; }
+  .density-nums { font-family: var(--mono); font-size: 10px; color: var(--text-secondary); white-space: nowrap; }
+  .density-ratio { font-family: var(--mono); font-size: 11px; font-weight: 600; min-width: 32px; text-align: right; }
+
+  /* ===== DUP CONTACTS ===== */
+  .dup-group { border: 1px solid var(--border); border-radius: 5px; margin-bottom: 8px; overflow: hidden; }
+  .dup-group:last-child { margin-bottom: 0; }
+  .dup-header { background: rgba(168,85,247,0.07); border-bottom: 1px solid var(--border); padding: 7px 11px; display: flex; align-items: center; justify-content: space-between; }
+  .dup-contact-val { font-family: var(--mono); font-size: 11px; color: var(--accent-purple); }
+  .dup-count { font-family: var(--mono); font-size: 10px; color: var(--text-muted); }
+  .dup-entry { padding: 5px 11px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(30,45,69,0.4); font-size: 12px; }
+  .dup-entry:last-child { border-bottom: none; }
+  .dup-abn { font-family: var(--mono); font-size: 11px; color: var(--text-muted); }
+  .dup-status { font-family: var(--mono); font-size: 10px; padding: 1px 5px; border-radius: 3px; }
+  .dup-status.active { background: rgba(34,197,94,0.1); color: var(--accent-green); border: 1px solid rgba(34,197,94,0.2); }
+  .dup-status.cancelled { background: rgba(239,68,68,0.1); color: var(--risk-critical); border: 1px solid rgba(239,68,68,0.2); }
+
+  /* ===== TIMELINE ===== */
+  .timeline-item { display: flex; gap: 10px; padding: 9px 14px; border-bottom: 1px solid rgba(30,45,69,0.5); align-items: flex-start; font-size: 12px; }
+  .timeline-item:last-child { border-bottom: none; }
+  .tl-dot { width: 7px; height: 7px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
+  .tl-time { font-family: var(--mono); font-size: 10px; color: var(--text-muted); min-width: 68px; flex-shrink: 0; padding-top: 1px; }
+  .tl-text { color: var(--text-secondary); flex: 1; line-height: 1.4; }
+  .tl-text strong { color: var(--text-primary); }
+
+  /* ===== MAP TAB ===== */
+  #mapView {
+    padding: 0;
+  }
+
+  .map-layout {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    height: calc(100vh - 130px);
+  }
+
+  #leaflet-map {
+    width: 100%;
+    height: 100%;
+    background: #0a0d12;
+  }
+
+  .map-sidebar {
+    background: var(--bg-panel);
+    border-left: 1px solid var(--border);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .map-sidebar-header {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-secondary);
+    position: sticky;
+    top: 0;
+    background: var(--bg-panel);
+    z-index: 10;
+  }
+
+  .map-suburb-item {
+    padding: 10px 14px;
+    border-bottom: 1px solid rgba(30,45,69,0.5);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .map-suburb-item:hover { background: var(--bg-hover); }
+  .map-suburb-item.selected { background: rgba(30,144,255,0.08); border-left: 2px solid var(--accent-blue); }
+
+  .map-suburb-name { font-weight: 500; font-size: 13px; margin-bottom: 3px; }
+  .map-suburb-meta { font-family: var(--mono); font-size: 10px; color: var(--text-muted); display: flex; gap: 10px; }
+
+  .map-ratio {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 3px;
+  }
+
+  .map-legend {
+    padding: 12px 14px;
+    border-top: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 10px;
+    background: var(--bg-panel);
+    position: sticky;
+    bottom: 0;
+  }
+
+  .map-legend-title { color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; color: var(--text-secondary); }
+  .legend-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+
+  /* ===== ABN TRACKER TAB ===== */
+  #abnTracker { padding: 20px 24px; }
+
+  .tracker-search-bar {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+  }
+
+  .tracker-field { flex: 1; }
+  .tracker-label { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 6px; }
+
+  .tracker-input {
+    width: 100%;
+    background: var(--bg-base);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    font-family: var(--mono);
+    font-size: 16px;
+    border-radius: 5px;
+    padding: 8px 12px;
+    outline: none;
+    letter-spacing: 0.08em;
+    transition: border-color 0.2s;
+  }
+
+  .tracker-input:focus { border-color: var(--accent-blue); box-shadow: 0 0 0 2px rgba(30,144,255,0.1); }
+  .tracker-input::placeholder { color: var(--text-muted); font-size: 14px; letter-spacing: 0.02em; }
+
+  .btn {
+    padding: 9px 18px;
+    border-radius: 5px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .btn-primary {
+    background: var(--accent-blue);
+    color: white;
+  }
+
+  .btn-primary:hover { background: #0077ee; }
+  .btn-primary:disabled { background: var(--border); color: var(--text-muted); cursor: not-allowed; }
+
+  .btn-secondary {
+    background: var(--bg-hover);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+  }
+
+  .btn-secondary:hover { border-color: var(--border-bright); color: var(--text-primary); }
+
+  .btn-danger {
+    background: rgba(239,68,68,0.15);
+    border: 1px solid rgba(239,68,68,0.3);
+    color: var(--risk-critical);
+  }
+
+  .btn-danger:hover { background: rgba(239,68,68,0.25); }
+
+  /* ABN Result Card */
+  .abn-result-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+
+  .result-section { display: none; }
+  .result-section.visible { display: block; }
+
+  .abn-result-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .abn-result-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .abn-result-name { font-size: 16px; font-weight: 600; margin-bottom: 3px; }
+  .abn-result-abn { font-family: var(--mono); font-size: 12px; color: var(--text-muted); letter-spacing: 0.06em; }
+
+  .abn-status {
+    display: flex; flex-direction: column; align-items: flex-end; gap: 4px;
+  }
+
+  .status-pill {
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .status-pill.active { background: rgba(34,197,94,0.15); color: var(--accent-green); border: 1px solid rgba(34,197,94,0.3); }
+  .status-pill.cancelled { background: rgba(239,68,68,0.15); color: var(--risk-critical); border: 1px solid rgba(239,68,68,0.3); }
+  .status-pill.suspended { background: rgba(245,158,11,0.15); color: var(--accent-amber); border: 1px solid rgba(245,158,11,0.3); }
+
+  .detail-row {
+    display: flex;
+    padding: 7px 16px;
+    border-bottom: 1px solid rgba(30,45,69,0.4);
+    font-size: 12px;
+    gap: 12px;
+  }
+
+  .detail-row:last-child { border-bottom: none; }
+
+  .detail-key {
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    min-width: 130px;
+    padding-top: 1px;
+    flex-shrink: 0;
+  }
+
+  .detail-val { color: var(--text-primary); flex: 1; word-break: break-all; }
+
+  /* History Timeline */
+  .history-item {
+    display: flex;
+    gap: 12px;
+    padding: 10px 16px;
+    border-bottom: 1px solid rgba(30,45,69,0.4);
+    align-items: flex-start;
+    font-size: 12px;
+  }
+
+  .history-item:last-child { border-bottom: none; }
+
+  .history-icon {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+
+  .history-icon.register { background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.3); }
+  .history-icon.cancel { background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); }
+  .history-icon.namechange { background: rgba(30,144,255,0.15); border: 1px solid rgba(30,144,255,0.3); }
+  .history-icon.flag { background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.3); }
+
+  .history-body { flex: 1; }
+  .history-event { font-weight: 500; color: var(--text-primary); margin-bottom: 2px; }
+  .history-date { font-family: var(--mono); font-size: 10px; color: var(--text-muted); }
+
+  /* Cross-ref links */
+  .crossref-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 16px;
+    border-bottom: 1px solid rgba(30,45,69,0.4);
+    font-size: 12px;
+    gap: 10px;
+  }
+  .crossref-item:last-child { border-bottom: none; }
+  .crossref-abn { font-family: var(--mono); font-size: 11px; color: var(--text-muted); }
+
+  /* Tracker placeholder */
+  .tracker-placeholder {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-muted);
+  }
+  .tracker-placeholder-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.4; }
+  .tracker-placeholder-text { font-family: var(--mono); font-size: 12px; line-height: 1.6; }
+
+  /* Tracker loading */
+  .tracker-loading {
+    text-align: center;
+    padding: 60px 20px;
+    display: none;
+  }
+  .spinner {
+    width: 36px; height: 36px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent-blue);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 16px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { font-family: var(--mono); font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+
+  /* ===== EXPORT TAB ===== */
+  #exportTab { padding: 20px 24px; }
+
+  .export-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 20px; }
+
+  .export-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+
+  .export-card:hover { border-color: var(--border-bright); }
+
+  .export-card-header {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .export-icon {
+    width: 34px; height: 34px;
+    border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .export-icon.csv { background: rgba(34,197,94,0.12); }
+  .export-icon.json { background: rgba(30,144,255,0.12); }
+  .export-icon.report { background: rgba(245,158,11,0.12); }
+
+  .export-card-title { font-weight: 600; font-size: 14px; margin-bottom: 2px; }
+  .export-card-desc { font-size: 11px; color: var(--text-muted); }
+
+  .export-card-body { padding: 14px 16px; }
+
+  .export-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  .export-option input[type="checkbox"] { accent-color: var(--accent-blue); cursor: pointer; }
+  .export-option label { cursor: pointer; color: var(--text-secondary); }
+
+  .export-card-footer { padding: 0 16px 14px; }
+
+  .export-preview {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 14px;
+  }
+
+  .export-preview-header {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--mono); font-size: 11px; color: var(--text-muted);
+    display: flex; justify-content: space-between; align-items: center;
+    background: rgba(255,255,255,0.01);
+  }
+
+  .export-preview-body {
+    padding: 12px 14px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent-green);
+    background: rgba(0,0,0,0.3);
+    max-height: 220px;
+    overflow-y: auto;
+    white-space: pre;
+    line-height: 1.6;
+  }
+
+  .export-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .export-stat {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    text-align: center;
+  }
+
+  .export-stat-val { font-family: var(--mono); font-size: 20px; font-weight: 600; color: var(--accent-blue); }
+  .export-stat-label { font-family: var(--mono); font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 3px; }
+
+  /* ===== NOTIFICATION TOAST ===== */
+  .toast {
+    position: fixed;
+    bottom: 24px; right: 24px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-family: var(--mono);
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    z-index: 9000;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.3s;
+    pointer-events: none;
+    max-width: 340px;
+  }
+
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.success { border-color: rgba(34,197,94,0.4); }
+  .toast.error { border-color: rgba(239,68,68,0.4); }
+  .toast.info { border-color: rgba(30,144,255,0.4); }
+
+  /* ===== FOOTER ===== */
+  .footer {
+    padding: 12px 24px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 10px;
+    color: var(--text-muted);
+    font-family: var(--mono);
+  }
+
+  /* ===== LEAFLET DARK OVERRIDES ===== */
+  .leaflet-container { background: #0a0d12 !important; }
+  .leaflet-popup-content-wrapper {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 6px !important;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5) !important;
+    color: var(--text-primary) !important;
+    font-family: var(--sans) !important;
+  }
+  .leaflet-popup-tip { background: var(--bg-card) !important; }
+  .leaflet-popup-close-button { color: var(--text-muted) !important; }
+
+  .popup-title { font-weight: 600; font-size: 14px; margin-bottom: 6px; }
+  .popup-row { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 3px; }
+  .popup-key { color: var(--text-muted); }
+  .popup-val { font-family: var(--mono); font-size: 11px; }
+  .popup-risk { margin-top: 8px; }
+
+  .map-controls-overlay {
+    position: absolute;
+    top: 12px; left: 12px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .map-ctrl-card {
+    background: rgba(15,20,32,0.92);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    backdrop-filter: blur(8px);
+    min-width: 180px;
+  }
+
+  .map-ctrl-title { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 8px; }
+
+  /* ===== RESPONSIVE ===== */
+  @media (max-width: 1100px) {
+    .kpi-grid { grid-template-columns: repeat(3, 1fr); }
+    .g2, .g-2-1, .g-1-1-auto { grid-template-columns: 1fr; }
+    .map-layout { grid-template-columns: 1fr; }
+    .map-sidebar { height: 300px; }
+    .export-grid { grid-template-columns: 1fr; }
+    .abn-result-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="header-left">
+    <div class="logo-mark">N↯</div>
+    <div>
+      <div class="header-title">NDIS FRAUD INTELLIGENCE</div>
+      <div class="header-subtitle">Provider Risk Analysis · v0.2</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div id="dataBadge" class="data-source-badge mock">
+      <span class="live-dot"></span>
+      <span id="dataBadgeText">Mock Data</span>
+    </div>
+    <div class="last-updated" id="lastUpdated">Last updated: —</div>
+  </div>
+</header>
+
+<!-- TAB NAV -->
+<nav class="tab-nav">
+  <button class="tab-btn active" data-tab="overview" onclick="switchTab('overview', this)">📊 Overview</button>
+  <button class="tab-btn" data-tab="mapView" onclick="switchTab('mapView', this)">🗺 Map View</button>
+  <button class="tab-btn" data-tab="abnTracker" onclick="switchTab('abnTracker', this)">🔍 ABN Tracker</button>
+  <button class="tab-btn" data-tab="exportTab" onclick="switchTab('exportTab', this)">📤 Export</button>
+</nav>
+
+<!-- CONTROLS BAR (Overview) -->
+<div class="controls-bar" id="overviewControls">
+  <div class="control-group">
+    <span class="control-label">State</span>
+    <select id="stateFilter" onchange="applyFilters()">
+      <option value="ALL">All States</option>
+      <option value="NSW">NSW</option>
+      <option value="VIC">VIC</option>
+      <option value="QLD">QLD</option>
+      <option value="WA">WA</option>
+      <option value="SA">SA</option>
+      <option value="ACT">ACT</option>
+    </select>
+  </div>
+  <div class="control-group">
+    <span class="control-label">Min Risk</span>
+    <input type="range" id="riskThreshold" min="0" max="100" value="0" oninput="updateThreshold(this.value)">
+    <span class="range-value" id="thresholdVal">0</span>
+  </div>
+  <div class="control-group">
+    <span class="filter-chip active" data-flag="all" onclick="toggleFlag(this)">All</span>
+    <span class="filter-chip" data-flag="dup-contact" onclick="toggleFlag(this)">Dup Contact</span>
+    <span class="filter-chip" data-flag="reregistered" onclick="toggleFlag(this)">Re-registered</span>
+    <span class="filter-chip" data-flag="density" onclick="toggleFlag(this)">Density Alert</span>
+    <span class="filter-chip" data-flag="abn-change" onclick="toggleFlag(this)">ABN Change</span>
+  </div>
+</div>
+
+<!-- ========================= OVERVIEW TAB ========================= -->
+<div id="overview" class="tab-panel active">
+<div class="main">
+
+  <!-- KPI CARDS -->
+  <div class="kpi-grid">
+    <div class="kpi-card blue">
+      <div class="kpi-label">Providers Monitored</div>
+      <div class="kpi-value" id="kpi-total">—</div>
+      <div class="kpi-change" id="kpi-total-sub">Loading...</div>
+    </div>
+    <div class="kpi-card red">
+      <div class="kpi-label">High Risk Flagged</div>
+      <div class="kpi-value" id="kpi-flagged">—</div>
+      <div class="kpi-change up" id="kpi-flagged-sub">Loading...</div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-label">Duplicate Contacts</div>
+      <div class="kpi-value" id="kpi-dup">—</div>
+      <div class="kpi-change up" id="kpi-dup-sub">Loading...</div>
+    </div>
+    <div class="kpi-card green">
+      <div class="kpi-label">Re-registrations</div>
+      <div class="kpi-value" id="kpi-rereg">—</div>
+      <div class="kpi-change" id="kpi-rereg-sub">Loading...</div>
+    </div>
+    <div class="kpi-card purple">
+      <div class="kpi-label">Density Alerts</div>
+      <div class="kpi-value" id="kpi-density">—</div>
+      <div class="kpi-change" id="kpi-density-sub">Loading...</div>
+    </div>
+  </div>
+
+  <!-- Charts Row -->
+  <div class="g2">
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><span class="ptd red"></span>Risk Score Distribution</div>
+        <div class="panel-badge" id="risk-dist-badge">—</div>
+      </div>
+      <div class="panel-body"><div class="chart-wrap"><canvas id="riskChart"></canvas></div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><span class="ptd amber"></span>Registrations vs Cancellations</div>
+      </div>
+      <div class="panel-body"><div class="chart-wrap"><canvas id="regChart"></canvas></div></div>
+    </div>
+  </div>
+
+  <!-- Provider Table + Activity Feed -->
+  <div class="g-2-1">
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><span class="ptd red"></span>Flagged Providers</div>
+        <div class="panel-badge" id="table-count">—</div>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>ABN</th>
+              <th>Provider Name</th>
+              <th>State</th>
+              <th>Risk Score</th>
+              <th>Level</th>
+              <th>Flags</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="riskTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><span class="ptd amber"></span>Recent Alerts</div>
+      </div>
+      <div id="activityFeed"></div>
+    </div>
+  </div>
+
+  <!-- Suburb Density + Dup Contacts -->
+  <div class="g2">
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><span class="ptd amber"></span>Provider Density vs Expected Population</div>
+      </div>
+      <div id="suburbList"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><span class="ptd purple"></span>Duplicate Contact Clusters</div>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text-muted)">Same phone/email → multiple ABNs</span>
+      </div>
+      <div class="panel-body" style="padding:10px">
+        <div id="dupContactList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts Row 2 -->
+  <div class="g2">
+    <div class="panel">
+      <div class="panel-header"><div class="panel-title"><span class="ptd blue"></span>Fraud Indicators by Type</div></div>
+      <div class="panel-body"><div class="chart-wrap"><canvas id="flagChart"></canvas></div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><div class="panel-title"><span class="ptd green"></span>Flagged Providers by State</div></div>
+      <div class="panel-body"><div class="chart-wrap"><canvas id="stateChart"></canvas></div></div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<!-- ========================= MAP TAB ========================= -->
+<div id="mapView" class="tab-panel">
+  <div class="map-layout">
+    <div style="position:relative">
+      <div id="leaflet-map"></div>
+      <div class="map-controls-overlay">
+        <div class="map-ctrl-card">
+          <div class="map-ctrl-title">Density Threshold</div>
+          <div class="control-group" style="flex-direction:column;align-items:flex-start;gap:5px">
+            <input type="range" id="mapRatioFilter" min="1" max="5" step="0.1" value="1" oninput="updateMapFilter(this.value)" style="width:160px">
+            <span style="font-family:var(--mono);font-size:11px;color:var(--accent-blue)">Show ≥ <span id="mapRatioVal">1.0</span>× expected</span>
+          </div>
+        </div>
+        <div class="map-ctrl-card">
+          <div class="map-ctrl-title">State Filter</div>
+          <select id="mapStateFilter" onchange="updateMapFilter()" style="width:100%">
+            <option value="ALL">All States</option>
+            <option value="NSW">NSW</option>
+            <option value="VIC">VIC</option>
+            <option value="QLD">QLD</option>
+            <option value="WA">WA</option>
+            <option value="SA">SA</option>
+            <option value="ACT">ACT</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="map-sidebar">
+      <div class="map-sidebar-header">
+        🔴 Density Hot Spots — <span id="suburbCount">0</span> suburbs
+      </div>
+      <div id="mapSuburbList" style="flex:1;overflow-y:auto"></div>
+      <div class="map-legend">
+        <div class="map-legend-title">Provider / Expected Ratio</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div> ≥ 3.5× Critical</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#f97316"></div> 2.5–3.5× High</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div> 1.5–2.5× Elevated</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#22c55e"></div> &lt; 1.5× Normal</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========================= ABN TRACKER TAB ========================= -->
+<div id="abnTracker" class="tab-panel">
+  <div class="tracker-search-bar">
+    <div class="tracker-field">
+      <div class="tracker-label">ABN Number</div>
+      <input type="text" class="tracker-input" id="abnInput" placeholder="51 824 753 556"
+             maxlength="14" oninput="formatABN(this)" onkeydown="if(event.key==='Enter')lookupABN()">
+    </div>
+    <div>
+      <div class="tracker-label">&nbsp;</div>
+      <button class="btn btn-primary" onclick="lookupABN()" id="lookupBtn">🔍 Lookup ABN</button>
+    </div>
+    <div>
+      <div class="tracker-label">&nbsp;</div>
+      <button class="btn btn-secondary" onclick="clearTracker()">Clear</button>
+    </div>
+  </div>
+
+  <!-- Loading state -->
+  <div class="tracker-loading" id="trackerLoading">
+    <div class="spinner"></div>
+    <div class="loading-text">Querying ABR &amp; NDIS Provider Register...</div>
+  </div>
+
+  <!-- Placeholder -->
+  <div id="trackerPlaceholder" class="tracker-placeholder">
+    <div class="tracker-placeholder-icon">🔍</div>
+    <div class="tracker-placeholder-text">Enter an ABN to look up its full registration history,<br>business name changes, NDIS registration status,<br>and cross-references with known flagged operators.</div>
+  </div>
+
+  <!-- Results -->
+  <div class="result-section" id="trackerResults">
+    <div class="abn-result-grid">
+
+      <!-- Left col: Current details + History -->
+      <div>
+        <div class="abn-result-card" style="margin-bottom:14px">
+          <div class="abn-result-header">
+            <div>
+              <div class="abn-result-name" id="res-name">—</div>
+              <div class="abn-result-abn" id="res-abn">ABN —</div>
+            </div>
+            <div class="abn-status">
+              <span class="status-pill" id="res-status">—</span>
+              <span id="res-risk-badge"></span>
+            </div>
+          </div>
+          <div id="res-details"></div>
+        </div>
+
+        <div class="abn-result-card">
+          <div class="panel-header">
+            <div class="panel-title"><span class="ptd blue"></span>Registration History</div>
+            <span style="font-family:var(--mono);font-size:10px;color:var(--text-muted)" id="res-history-count">0 events</span>
+          </div>
+          <div id="res-history"></div>
+        </div>
+      </div>
+
+      <!-- Right col: Cross-references + Risk assessment -->
+      <div>
+        <div class="abn-result-card" style="margin-bottom:14px">
+          <div class="panel-header">
+            <div class="panel-title"><span class="ptd purple"></span>Cross-Referenced ABNs</div>
+            <span style="font-family:var(--mono);font-size:10px;color:var(--text-muted)">Same operator / contact</span>
+          </div>
+          <div id="res-crossref"></div>
+        </div>
+
+        <div class="abn-result-card">
+          <div class="panel-header">
+            <div class="panel-title"><span class="ptd red"></span>Risk Assessment</div>
+          </div>
+          <div class="panel-body" id="res-risk-body">
+            <div style="font-family:var(--mono);font-size:12px;color:var(--text-muted)">No risk signals detected.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========================= EXPORT TAB ========================= -->
+<div id="exportTab" class="tab-panel">
+  <div style="padding:20px 24px">
+
+    <div class="export-stats" id="exportStats"></div>
+
+    <div class="export-grid">
+
+      <!-- CSV Export -->
+      <div class="export-card">
+        <div class="export-card-header">
+          <div class="export-icon csv">📄</div>
+          <div>
+            <div class="export-card-title">CSV Export</div>
+            <div class="export-card-desc">Flat file for Excel / Power BI</div>
+          </div>
+        </div>
+        <div class="export-card-body">
+          <div class="export-option">
+            <input type="checkbox" id="csv-all" checked><label for="csv-all">All monitored providers</label>
+          </div>
+          <div class="export-option">
+            <input type="checkbox" id="csv-flagged" checked><label for="csv-flagged">Flagged only (risk ≥ 50)</label>
+          </div>
+          <div class="export-option">
+            <input type="checkbox" id="csv-critical" checked><label for="csv-critical">Critical risk only</label>
+          </div>
+          <div class="export-option">
+            <input type="checkbox" id="csv-history"><label for="csv-history">Include ABN history</label>
+          </div>
+        </div>
+        <div class="export-card-footer">
+          <button class="btn btn-primary" style="width:100%" onclick="exportCSV()">⬇ Download CSV</button>
+        </div>
+      </div>
+
+      <!-- JSON Export -->
+      <div class="export-card">
+        <div class="export-card-header">
+          <div class="export-icon json">{ }</div>
+          <div>
+            <div class="export-card-title">JSON Export</div>
+            <div class="export-card-desc">Structured data for APIs / tools</div>
+          </div>
+        </div>
+        <div class="export-card-body">
+          <div class="export-option">
+            <input type="checkbox" id="json-providers" checked><label for="json-providers">Provider risk data</label>
+          </div>
+          <div class="export-option">
+            <input type="checkbox" id="json-suburbs" checked><label for="json-suburbs">Suburb density data</label>
+          </div>
+          <div class="export-option">
+            <input type="checkbox" id="json-clusters" checked><label for="json-clusters">Duplicate contact clusters</label>
+          </div>
+          <div class="export-option">
+            <input type="checkbox" id="json-meta" checked><label for="json-meta">Export metadata</label>
+          </div>
+        </div>
+        <div class="export-card-footer">
+          <button class="btn btn-primary" style="width:100%" onclick="exportJSON()">⬇ Download JSON</button>
+        </div>
+      </div>
+
+      <!-- Referral Report -->
+      <div class="export-card">
+        <div class="export-card-header">
+          <div class="export-icon report">📋</div>
+          <div>
+            <div class="export-card-title">Referral Report</div>
+            <div class="export-card-desc">Formatted for NDIS Commission / AFP</div>
+          </div>
+        </div>
+        <div class="export-card-body">
+          <div class="export-option">
+            <input type="checkbox" id="rep-critical" checked><label for="rep-critical">Critical risk providers</label>
+          </div>
+          <div class="export-option">
+            <input type="checkbox" id="rep-rereg" checked><label for="rep-rereg">Re-registration patterns</label>
+          </div>
+          <div class="export-option">
+            <input type="checkbox" id="rep-dup" checked><label for="rep-dup">Duplicate contact clusters</label>
+          </div>
+          <div class="export-option">
+            <input type="checkbox" id="rep-density" checked><label for="rep-density">Suburb density anomalies</label>
+          </div>
+        </div>
+        <div class="export-card-footer">
+          <button class="btn btn-primary" style="width:100%" onclick="exportReport()">⬇ Download Report (TXT)</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- JSON Preview -->
+    <div class="export-preview">
+      <div class="export-preview-header">
+        <span>📄 JSON PREVIEW — Flagged Providers</span>
+        <button class="btn btn-secondary" style="padding:3px 10px;font-size:10px" onclick="refreshPreview()">↻ Refresh</button>
+      </div>
+      <div class="export-preview-body" id="jsonPreview">Loading preview...</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast">
+  <span id="toastIcon">✓</span>
+  <span id="toastMsg">Done</span>
+</div>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div>NDIS Fraud Intelligence Platform · v0.2 · Sources: NDIS Provider Register · ABR · ABS</div>
+  <div id="footerDataNote">Running on mock data — configure WORKER_URL to enable live data</div>
+</footer>
+
+<script>
+// ================================================================
+//  CONFIG — Update WORKER_URL after deploying your Cloudflare Worker
+// ================================================================
+const CONFIG = {
+  WORKER_URL: 'https://ndis-fraud-intelligence.jerrya-byte.workers.dev',          // e.g. 'https://ndis-fraud.yourusername.workers.dev'
+  USE_MOCK: true,          // Auto-set to false when WORKER_URL is populated
+  VERSION: '0.2.0'
+};
+
+// Auto-detect whether to use mock or live data
+if (CONFIG.WORKER_URL) {
+  CONFIG.USE_MOCK = false;
+}
+
+// ================================================================
+//  MOCK DATA
+// ================================================================
+const MOCK = {
+  providers: [
+    { abn: "51 234 567 891", name: "Sunrise Disability Services Pty Ltd", state: "NSW", score: 94, level: "critical", flags: ["dup-contact","reregistered"], phone: "0412 *** 891", postcode: "2165", suburb: "Fairfield" },
+    { abn: "72 891 234 567", name: "CarePath Solutions Australia",          state: "VIC", score: 89, level: "critical", flags: ["dup-contact","abn-change"],   phone: "admin@carepathau.com.au", postcode: "3175", suburb: "Dandenong" },
+    { abn: "33 456 789 012", name: "EnableCare Group Pty Ltd",              state: "QLD", score: 87, level: "critical", flags: ["reregistered","density"],     phone: "0478 *** 224", postcode: "4114", suburb: "Logan Central" },
+    { abn: "91 012 345 678", name: "PrimeSupport Services",                 state: "NSW", score: 82, level: "critical", flags: ["dup-contact","no-service"],   phone: "02 9649 ****", postcode: "2163", suburb: "Villawood" },
+    { abn: "64 789 012 345", name: "AccessAbility Connect",                 state: "WA",  score: 78, level: "high",     flags: ["density","abn-change"],       phone: "0401 *** 556", postcode: "6000", suburb: "Perth CBD" },
+    { abn: "17 345 678 901", name: "Horizon Community Care",                state: "NSW", score: 74, level: "high",     flags: ["dup-contact"],                phone: "0412 *** 891", postcode: "2144", suburb: "Auburn" },
+    { abn: "85 678 901 234", name: "BrightPath Supports Co",                state: "VIC", score: 71, level: "high",     flags: ["reregistered"],               phone: "0467 *** 331", postcode: "3029", suburb: "Hoppers Crossing" },
+    { abn: "48 901 234 567", name: "Oasis Care Pty Ltd",                    state: "SA",  score: 68, level: "high",     flags: ["density","dup-contact"],      phone: "0489 *** 102", postcode: "5000", suburb: "Adelaide CBD" },
+    { abn: "26 234 567 890", name: "Nexus Allied Health Pty Ltd",           state: "QLD", score: 61, level: "medium",   flags: ["no-service"],                 phone: "07 3212 ****", postcode: "4101", suburb: "South Brisbane" },
+    { abn: "59 567 890 123", name: "ClearView Disability Services",         state: "ACT", score: 55, level: "medium",   flags: ["abn-change"],                 phone: "02 6140 ****", postcode: "2601", suburb: "Canberra City" },
+    { abn: "82 890 123 456", name: "TrueNorth Support Group",               state: "NSW", score: 52, level: "medium",   flags: ["density"],                   phone: "0411 *** 779", postcode: "2199", suburb: "Lakemba" },
+    { abn: "15 123 456 789", name: "Coastal Living Supports",               state: "QLD", score: 41, level: "medium",   flags: ["dup-contact"],                phone: "0422 *** 881", postcode: "4215", suburb: "Gold Coast" },
+  ],
+
+  suburbs: [
+    { name: "Fairfield",       state: "NSW", lat: -33.8711, lng: 150.9553, providers: 84, expected: 22, ratio: 3.82 },
+    { name: "Auburn",          state: "NSW", lat: -33.8493, lng: 151.0330, providers: 71, expected: 19, ratio: 3.74 },
+    { name: "Dandenong",       state: "VIC", lat: -37.9878, lng: 145.2154, providers: 63, expected: 18, ratio: 3.50 },
+    { name: "Villawood",       state: "NSW", lat: -33.8667, lng: 150.9833, providers: 56, expected: 17, ratio: 3.29 },
+    { name: "Merrylands",      state: "NSW", lat: -33.8333, lng: 151.0000, providers: 49, expected: 16, ratio: 3.06 },
+    { name: "Broadmeadows",    state: "VIC", lat: -37.6833, lng: 144.9167, providers: 44, expected: 15, ratio: 2.93 },
+    { name: "Logan Central",   state: "QLD", lat: -27.6389, lng: 153.1078, providers: 38, expected: 14, ratio: 2.71 },
+    { name: "Lakemba",         state: "NSW", lat: -33.9167, lng: 151.0667, providers: 35, expected: 13, ratio: 2.69 },
+    { name: "Bankstown",       state: "NSW", lat: -33.9167, lng: 151.0333, providers: 31, expected: 14, ratio: 2.21 },
+    { name: "Springvale",      state: "VIC", lat: -37.9500, lng: 145.1500, providers: 27, expected: 13, ratio: 2.08 },
+    { name: "Cabramatta",      state: "NSW", lat: -33.8938, lng: 150.9407, providers: 24, expected: 12, ratio: 2.00 },
+    { name: "Sunshine",        state: "VIC", lat: -37.7833, lng: 144.8333, providers: 21, expected: 12, ratio: 1.75 },
+  ],
+
+  dupContacts: [
+    { contact: "0412 *** 891", type: "Mobile", entries: [
+        { name: "Sunrise Disability Services Pty Ltd", abn: "51 234 567 891", status: "active" },
+        { name: "Sunrise Care Group (Aust)",           abn: "73 112 445 902", status: "cancelled" },
+        { name: "SRC Support Services",                abn: "19 098 334 771", status: "cancelled" },
+    ]},
+    { contact: "admin@carepathau.com.au", type: "Email", entries: [
+        { name: "CarePath Solutions Australia",  abn: "72 891 234 567", status: "active" },
+        { name: "CarePath Health Pty Ltd",       abn: "44 229 881 003", status: "cancelled" },
+    ]},
+    { contact: "0478 *** 224", type: "Mobile", entries: [
+        { name: "EnableCare Group Pty Ltd",  abn: "33 456 789 012", status: "active" },
+        { name: "Enable & Grow Services",    abn: "67 441 002 889", status: "cancelled" },
+    ]},
+  ],
+
+  activity: [
+    { time: "09:31", color: "#ef4444", text: "<strong>New flag:</strong> Duplicate mobile detected across 3 ABNs in Fairfield NSW" },
+    { time: "08:54", color: "#f97316", text: "<strong>Re-registration:</strong> EnableCare Group linked to cancelled ABN 67 441 002 889" },
+    { time: "08:12", color: "#f59e0b", text: "<strong>Density alert:</strong> Auburn NSW now 3.7× expected provider ratio" },
+    { time: "Yesterday", color: "#ef4444", text: "<strong>Critical:</strong> PrimeSupport Services — claims with no participant match" },
+    { time: "Yesterday", color: "#a855f7", text: "<strong>Contact cluster:</strong> New shared email across 2 VIC providers detected" },
+    { time: "28 Mar", color: "#f59e0b", text: "<strong>ABN change:</strong> AccessAbility Connect — 3rd ABN in 18 months" },
+    { time: "27 Mar", color: "#22c55e", text: "<strong>Resolved:</strong> Coastal Living Supports — cleared after audit" },
+  ],
+
+  kpis: { total: 4821, flagged: 127, dup: 38, rereg: 19, density: 23 }
+};
+
+// ================================================================
+//  MOCK ABN LOOKUP DATA
+// ================================================================
+const MOCK_ABN_DB = {
+  "51234567891": {
+    abn: "51 234 567 891", name: "Sunrise Disability Services Pty Ltd",
+    type: "Australian Private Company", state: "NSW",
+    postcode: "2165", suburb: "Fairfield",
+    status: "Active", gstRegistered: "Yes",
+    registeredDate: "14 Feb 2019", lastUpdated: "2 Jan 2025",
+    history: [
+      { type: "register",    date: "14 Feb 2019", event: "ABN registered — Sunrise Disability Services Pty Ltd" },
+      { type: "namechange",  date: "3 Jun 2020",  event: "Business name added: Sunrise Care NSW" },
+      { type: "flag",        date: "11 Mar 2022", event: "NDIS Quality & Safeguards Commission — compliance review initiated" },
+      { type: "flag",        date: "8 Nov 2023",  event: "Fraud Fusion Taskforce — manual payment review applied" },
+      { type: "namechange",  date: "15 Jan 2024", event: "Business name removed: Sunrise Care NSW" },
+    ],
+    crossRefs: [
+      { abn: "73 112 445 902", name: "Sunrise Care Group (Aust)",  reason: "Same mobile 0412 *** 891", status: "cancelled", riskScore: 91 },
+      { abn: "19 098 334 771", name: "SRC Support Services",        reason: "Same mobile 0412 *** 891", status: "cancelled", riskScore: 88 },
+    ],
+    riskScore: 94, riskLevel: "critical",
+    riskFactors: [
+      { label: "Duplicate contact across 3 ABNs",     severity: "critical" },
+      { label: "Two previously cancelled ABNs linked", severity: "critical" },
+      { label: "NDIS Fraud Fusion Taskforce flagged",  severity: "high" },
+      { label: "Compliance review on record",          severity: "high" },
+      { label: "Business name removed after review",   severity: "medium" },
+    ]
+  }
+};
+
+// ================================================================
+//  APP STATE
+// ================================================================
+let APP = {
+  providers: [],
+  suburbs: [],
+  dupContacts: [],
+  activity: [],
+  kpis: {},
+  filtered: [],
+  activeFlag: 'all',
+  minScore: 0,
+  activeState: 'ALL',
+  mapInstance: null,
+  mapMarkers: [],
+  chartsInit: false,
+  charts: {}
+};
+
+// ================================================================
+//  DATA LOADING
+// ================================================================
+async function loadData() {
+  if (CONFIG.USE_MOCK) {
+    APP.providers   = MOCK.providers;
+    APP.suburbs     = MOCK.suburbs;
+    APP.dupContacts = MOCK.dupContacts;
+    APP.activity    = MOCK.activity;
+    APP.kpis        = MOCK.kpis;
+    document.getElementById('lastUpdated').textContent = `Last updated: ${new Date().toLocaleString('en-AU', {timeZone:'Australia/Sydney',hour12:false}).replace(',','')} AEST`;
+    renderAll();
+    return;
+  }
+
+  // Live data fetch via Cloudflare Worker
+  try {
+    showToast('info', '🔄 Fetching live data from NDIS Provider Register...');
+    const [provRes, densityRes, kpiRes] = await Promise.all([
+      fetch(`${CONFIG.WORKER_URL}/api/providers`),
+      fetch(`${CONFIG.WORKER_URL}/api/density`),
+      fetch(`${CONFIG.WORKER_URL}/api/kpis`)
+    ]);
+
+    APP.providers   = await provRes.json();
+    const density   = await densityRes.json();
+    APP.suburbs     = density.suburbs;
+    APP.dupContacts = density.clusters;
+    APP.kpis        = await kpiRes.json();
+
+    document.getElementById('dataBadge').className = 'data-source-badge live';
+    document.getElementById('dataBadgeText').textContent = 'Live Data';
+    document.getElementById('lastUpdated').textContent = `Live — ${new Date().toLocaleString('en-AU',{timeZone:'Australia/Sydney',hour12:false})} AEST`;
+    document.getElementById('footerDataNote').textContent = `Live data from NDIS Provider Register + ABR`;
+    showToast('success', '✓ Live data loaded successfully');
+    renderAll();
+  } catch (e) {
+    console.warn('Worker fetch failed, falling back to mock data:', e);
+    APP.providers   = MOCK.providers;
+    APP.suburbs     = MOCK.suburbs;
+    APP.dupContacts = MOCK.dupContacts;
+    APP.activity    = MOCK.activity;
+    APP.kpis        = MOCK.kpis;
+    showToast('error', '⚠ Worker unavailable — using mock data');
+    renderAll();
+  }
+}
+
+// ================================================================
+//  RENDER EVERYTHING
+// ================================================================
+function renderAll() {
+  APP.filtered = [...APP.providers];
+  renderKPIs();
+  renderTable(APP.filtered);
+  renderSuburbs(APP.suburbs);
+  renderDupContacts(APP.dupContacts);
+  renderActivityFeed(APP.activity);
+  if (!APP.chartsInit) { initCharts(); APP.chartsInit = true; }
+  renderExportStats();
+  refreshPreview();
+}
+
+// ================================================================
+//  KPI CARDS
+// ================================================================
+function renderKPIs() {
+  const k = APP.kpis;
+  document.getElementById('kpi-total').textContent     = (k.total || 0).toLocaleString();
+  document.getElementById('kpi-flagged').textContent   = (k.flagged || 0).toLocaleString();
+  document.getElementById('kpi-dup').textContent       = (k.dup || 0).toLocaleString();
+  document.getElementById('kpi-rereg').textContent     = (k.rereg || 0).toLocaleString();
+  document.getElementById('kpi-density').textContent   = (k.density || 0).toLocaleString();
+  document.getElementById('kpi-total-sub').textContent   = 'Across all states';
+  document.getElementById('kpi-flagged-sub').textContent = '↑ 14 this month';
+  document.getElementById('kpi-dup-sub').textContent     = '↑ 6 new clusters';
+  document.getElementById('kpi-rereg-sub').textContent   = 'Same operator, new ABN';
+  document.getElementById('kpi-density-sub').textContent = 'Suburbs over-indexed';
+  document.getElementById('risk-dist-badge').textContent = `${k.flagged || 0} flagged`;
+}
+
+// ================================================================
+//  PROVIDER TABLE
+// ================================================================
+const FLAG_LABELS = { 'dup-contact':'Dup Contact','reregistered':'Re-registered','density':'Density','abn-change':'ABN Change','no-service':'No Service' };
+
+function renderTable(providers) {
+  const tbody = document.getElementById('riskTableBody');
+  tbody.innerHTML = providers.map(p => {
+    const rc = riskColor(p.level);
+    return `<tr>
+      <td><span class="abn-text">${p.abn}</span></td>
+      <td><span class="provider-name" title="${p.name}">${p.name}</span></td>
+      <td><span style="font-family:var(--mono);font-size:10px;color:var(--text-muted)">${p.state}</span></td>
+      <td>
+        <div class="score-wrap">
+          <div class="score-bar"><div class="score-fill" style="width:${p.score}%;background:${rc}"></div></div>
+          <span class="score-num" style="color:${rc}">${p.score}</span>
+        </div>
+      </td>
+      <td><span class="risk-badge ${p.level}">${p.level.toUpperCase()}</span></td>
+      <td><div class="flag-row">${p.flags.map(f=>`<span class="flag ${f}">${FLAG_LABELS[f]||f}</span>`).join('')}</div></td>
+      <td>
+        <button class="btn btn-secondary" style="padding:3px 8px;font-size:10px" onclick="jumpToABN('${p.abn}')">Track</button>
+      </td>
+    </tr>`;
+  }).join('');
+  document.getElementById('table-count').textContent = `Showing ${providers.length}`;
+}
+
+function jumpToABN(abn) {
+  switchTab('abnTracker', document.querySelector('[data-tab="abnTracker"]'));
+  document.getElementById('abnInput').value = abn;
+  lookupABN();
+}
+
+// ================================================================
+//  SUBURB DENSITY
+// ================================================================
+function renderSuburbs(data) {
+  const max = Math.max(...data.map(d => d.providers));
+  document.getElementById('suburbList').innerHTML = data.map(d => {
+    const barPct      = (d.providers / max) * 100;
+    const expPct      = (d.expected  / max) * 100;
+    const rc          = densityColor(d.ratio);
+    const ratioColor  = d.ratio >= 3.5 ? '#ef4444' : d.ratio >= 2.8 ? '#f97316' : '#f59e0b';
+    return `<div class="suburb-row">
+      <span class="suburb-name">${d.name}</span>
+      <span class="suburb-state">${d.state}</span>
+      <div class="density-wrap">
+        <div class="density-bar">
+          <div class="density-fill" style="width:${barPct}%;background:${rc}"></div>
+          <div class="density-expected" style="left:${expPct}%"></div>
+        </div>
+        <span class="density-nums">${d.providers} / ~${d.expected} exp.</span>
+      </div>
+      <span class="density-ratio" style="color:${ratioColor}">${d.ratio.toFixed(1)}×</span>
+    </div>`;
+  }).join('');
+}
+
+// ================================================================
+//  DUPLICATE CONTACTS
+// ================================================================
+function renderDupContacts(data) {
+  document.getElementById('dupContactList').innerHTML = data.map(g => `
+    <div class="dup-group">
+      <div class="dup-header">
+        <span class="dup-contact-val">${g.type === 'Email' ? '📧' : '📞'} ${g.contact}</span>
+        <span class="dup-count">${g.type} · ${g.entries.length} ABNs</span>
+      </div>
+      ${g.entries.map(e => `
+        <div class="dup-entry">
+          <span style="color:var(--text-primary);font-size:12px">${e.name}</span>
+          <div style="display:flex;gap:7px;align-items:center;flex-shrink:0">
+            <span class="dup-abn">${e.abn}</span>
+            <span class="dup-status ${e.status}">${e.status}</span>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `).join('');
+}
+
+// ================================================================
+//  ACTIVITY FEED
+// ================================================================
+function renderActivityFeed(data) {
+  document.getElementById('activityFeed').innerHTML = data.map(item => `
+    <div class="timeline-item">
+      <div class="tl-dot" style="background:${item.color}"></div>
+      <span class="tl-time">${item.time}</span>
+      <span class="tl-text">${item.text}</span>
+    </div>
+  `).join('');
+}
+
+// ================================================================
+//  CHARTS
+// ================================================================
+function initCharts() {
+  const gc = 'rgba(30,45,69,0.7)';
+  const tc = '#4a5568';
+  const mf = { family: "'IBM Plex Mono'", size: 11 };
+
+  APP.charts.risk = new Chart(document.getElementById('riskChart'), {
+    type: 'bar',
+    data: {
+      labels: ['0–20','21–40','41–60','61–75','76–90','91–100'],
+      datasets: [{
+        label: 'Providers',
+        data: [1820,1640,780,310,184,87],
+        backgroundColor: ['#22c55e33','#22c55e33','#f59e0b55','#f97316aa','#ef4444aa','#ef4444'],
+        borderColor:     ['#22c55e','#22c55e','#f59e0b','#f97316','#ef4444','#ef4444'],
+        borderWidth: 1, borderRadius: 3,
+      }]
+    },
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false} },
+      scales:{ x:{grid:{color:gc},ticks:{color:tc,font:mf}}, y:{grid:{color:gc},ticks:{color:tc,font:mf}} }
+    }
+  });
+
+  APP.charts.reg = new Chart(document.getElementById('regChart'), {
+    type: 'line',
+    data: {
+      labels: ['Jul 24','Aug','Sep','Oct','Nov','Dec','Jan 25','Feb','Mar'],
+      datasets: [
+        { label:'New Registrations', data:[142,138,167,155,189,201,178,193,211],
+          borderColor:'#1e90ff', backgroundColor:'rgba(30,144,255,0.07)', fill:true, tension:0.3, borderWidth:2, pointRadius:3 },
+        { label:'Cancellations', data:[38,44,41,52,67,58,71,83,94],
+          borderColor:'#ef4444', backgroundColor:'rgba(239,68,68,0.04)', fill:true, tension:0.3, borderWidth:2, pointRadius:3, borderDash:[4,3] }
+      ]
+    },
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{labels:{color:tc,font:mf,boxWidth:10,padding:10}} },
+      scales:{ x:{grid:{color:gc},ticks:{color:tc,font:mf}}, y:{grid:{color:gc},ticks:{color:tc,font:mf}} }
+    }
+  });
+
+  APP.charts.flags = new Chart(document.getElementById('flagChart'), {
+    type: 'bar',
+    data: {
+      labels: ['Dup. Contact','Re-registered','Density Alert','ABN Change','No Service Match'],
+      datasets: [{
+        data: [38,19,23,31,16],
+        backgroundColor: ['rgba(168,85,247,0.7)','rgba(239,68,68,0.7)','rgba(245,158,11,0.7)','rgba(249,115,22,0.7)','rgba(30,144,255,0.7)'],
+        borderColor:     ['#a855f7','#ef4444','#f59e0b','#f97316','#1e90ff'],
+        borderWidth:1, borderRadius:3,
+      }]
+    },
+    options: { indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false} },
+      scales:{ x:{grid:{color:gc},ticks:{color:tc,font:mf}}, y:{grid:{color:gc},ticks:{color:tc,font:{...mf,size:10}}} }
+    }
+  });
+
+  APP.charts.states = new Chart(document.getElementById('stateChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['NSW','VIC','QLD','WA','SA','ACT','Other'],
+      datasets: [{
+        data: [47,29,21,14,8,5,3],
+        backgroundColor: ['rgba(239,68,68,0.8)','rgba(249,115,22,0.8)','rgba(245,158,11,0.8)','rgba(168,85,247,0.8)','rgba(30,144,255,0.8)','rgba(34,197,94,0.8)','rgba(100,116,139,0.8)'],
+        borderColor: '#141a28', borderWidth:2,
+      }]
+    },
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{position:'right',labels:{color:tc,font:mf,boxWidth:10,padding:10}} }
+    }
+  });
+}
+
+// ================================================================
+//  FILTERS
+// ================================================================
+function updateThreshold(val) {
+  APP.minScore = parseInt(val);
+  document.getElementById('thresholdVal').textContent = val;
+  applyFilters();
+}
+
+function toggleFlag(el) {
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  APP.activeFlag = el.dataset.flag;
+  applyFilters();
+}
+
+function applyFilters() {
+  APP.activeState = document.getElementById('stateFilter').value;
+  APP.filtered = APP.providers.filter(p => {
+    const sc = p.score >= APP.minScore;
+    const st = APP.activeState === 'ALL' || p.state === APP.activeState;
+    const fl = APP.activeFlag === 'all' || p.flags.includes(APP.activeFlag);
+    return sc && st && fl;
+  });
+  renderTable(APP.filtered);
+}
+
+// ================================================================
+//  MAP
+// ================================================================
+function initMap() {
+  if (APP.mapInstance) return; // Already initialised
+
+  // Small delay to ensure the tab is visible and DOM has dimensions
+  setTimeout(() => {
+    APP.mapInstance = L.map('leaflet-map', {
+      center: [-27.5, 133.5],
+      zoom: 5,
+      zoomControl: true,
+      attributionControl: true
+    });
+
+    // CartoDB Dark Matter tiles — matches the dashboard aesthetic
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://carto.com">CARTO</a> &copy; <a href="https://openstreetmap.org">OpenStreetMap</a>',
+      subdomains: 'abcd',
+      maxZoom: 19
+    }).addTo(APP.mapInstance);
+
+    renderMapMarkers(APP.suburbs);
+    renderMapSidebar(APP.suburbs);
+  }, 150);
+}
+
+function renderMapMarkers(suburbs) {
+  if (!APP.mapInstance) return;
+
+  // Clear old markers
+  APP.mapMarkers.forEach(m => m.remove());
+  APP.mapMarkers = [];
+
+  const minRatio = parseFloat(document.getElementById('mapRatioFilter').value) || 1;
+  const stateFil = document.getElementById('mapStateFilter').value;
+
+  const filtered = suburbs.filter(s =>
+    s.ratio >= minRatio && (stateFil === 'ALL' || s.state === stateFil)
+  );
+
+  filtered.forEach(s => {
+    const color   = markerColor(s.ratio);
+    const radius  = Math.max(10, Math.min(40, s.providers / 2));
+    const marker  = L.circleMarker([s.lat, s.lng], {
+      radius,
+      fillColor: color,
+      fillOpacity: 0.7,
+      color: color,
+      weight: 1.5,
+      opacity: 0.9
+    }).addTo(APP.mapInstance);
+
+    marker.bindPopup(`
+      <div style="min-width:200px">
+        <div class="popup-title">${s.name}, ${s.state}</div>
+        <div class="popup-row"><span class="popup-key">Registered Providers</span><span class="popup-val">${s.providers}</span></div>
+        <div class="popup-row"><span class="popup-key">Expected (by population)</span><span class="popup-val">~${s.expected}</span></div>
+        <div class="popup-row"><span class="popup-key">Density Ratio</span><span class="popup-val" style="color:${color};font-weight:600">${s.ratio.toFixed(2)}×</span></div>
+        <div class="popup-row"><span class="popup-key">Risk Level</span><span class="popup-val" style="color:${color}">${ratioLabel(s.ratio)}</span></div>
+      </div>
+    `);
+
+    APP.mapMarkers.push(marker);
+  });
+}
+
+function renderMapSidebar(suburbs) {
+  const minRatio = parseFloat(document.getElementById('mapRatioFilter')?.value) || 1;
+  const stateFil = document.getElementById('mapStateFilter')?.value || 'ALL';
+
+  const filtered = suburbs
+    .filter(s => s.ratio >= minRatio && (stateFil === 'ALL' || s.state === stateFil))
+    .sort((a, b) => b.ratio - a.ratio);
+
+  document.getElementById('suburbCount').textContent = filtered.length;
+  document.getElementById('mapSuburbList').innerHTML = filtered.map(s => {
+    const color = markerColor(s.ratio);
+    return `<div class="map-suburb-item" onclick="flyToSuburb(${s.lat},${s.lng})">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div class="map-suburb-name">${s.name}</div>
+        <span class="map-ratio" style="background:${color}22;color:${color};border:1px solid ${color}55">${s.ratio.toFixed(1)}×</span>
+      </div>
+      <div class="map-suburb-meta">
+        <span>${s.state}</span>
+        <span>${s.providers} providers</span>
+        <span>~${s.expected} expected</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function flyToSuburb(lat, lng) {
+  if (APP.mapInstance) {
+    APP.mapInstance.flyTo([lat, lng], 13, { duration: 1.2 });
+  }
+}
+
+function updateMapFilter(val) {
+  const rangeEl = document.getElementById('mapRatioFilter');
+  if (val !== undefined && rangeEl) {
+    document.getElementById('mapRatioVal').textContent = parseFloat(val).toFixed(1);
+  }
+  renderMapMarkers(APP.suburbs);
+  renderMapSidebar(APP.suburbs);
+}
+
+// ================================================================
+//  ABN TRACKER
+// ================================================================
+function formatABN(input) {
+  let v = input.value.replace(/\D/g, '').substring(0,11);
+  if (v.length > 2)  v = v.slice(0,2) + ' ' + v.slice(2);
+  if (v.length > 6)  v = v.slice(0,6) + ' ' + v.slice(6);
+  if (v.length > 10) v = v.slice(0,10) + ' ' + v.slice(10);
+  input.value = v;
+}
+
+async function lookupABN() {
+  const raw = document.getElementById('abnInput').value.replace(/\s/g,'');
+  if (raw.length !== 11) { showToast('error', '⚠ Enter a valid 11-digit ABN'); return; }
+
+  document.getElementById('trackerPlaceholder').style.display = 'none';
+  document.getElementById('trackerResults').classList.remove('visible');
+  document.getElementById('trackerLoading').style.display = 'block';
+  document.getElementById('lookupBtn').disabled = true;
+
+  let data;
+
+  try {
+    if (!CONFIG.USE_MOCK && CONFIG.WORKER_URL) {
+      const res = await fetch(`${CONFIG.WORKER_URL}/api/abn/${raw}`);
+      data = await res.json();
+    } else {
+      // Mock: check DB, else generate generic result
+      await new Promise(r => setTimeout(r, 900)); // simulate latency
+      data = MOCK_ABN_DB[raw] || generateMockABNResult(raw);
+    }
+    renderABNResult(data);
+  } catch(e) {
+    showToast('error', `⚠ Lookup failed: ${e.message}`);
+    document.getElementById('trackerPlaceholder').style.display = 'block';
+  } finally {
+    document.getElementById('trackerLoading').style.display = 'none';
+    document.getElementById('lookupBtn').disabled = false;
+  }
+}
+
+function generateMockABNResult(abn) {
+  const fmt = `${abn.slice(0,2)} ${abn.slice(2,5)} ${abn.slice(5,8)} ${abn.slice(8)}`;
+  return {
+    abn: fmt, name: "Provider (Mock Result) Pty Ltd",
+    type: "Australian Private Company", state: "NSW",
+    postcode: "2000", suburb: "Sydney CBD",
+    status: "Active", gstRegistered: "Yes",
+    registeredDate: "1 Jan 2021", lastUpdated: "1 Jan 2025",
+    history: [
+      { type: "register", date: "1 Jan 2021", event: "ABN registered" },
+    ],
+    crossRefs: [],
+    riskScore: 12, riskLevel: "low",
+    riskFactors: []
+  };
+}
+
+function renderABNResult(d) {
+  document.getElementById('res-name').textContent = d.name;
+  document.getElementById('res-abn').textContent  = `ABN ${d.abn}`;
+
+  const sp = document.getElementById('res-status');
+  sp.textContent  = d.status;
+  sp.className    = `status-pill ${d.status.toLowerCase()}`;
+
+  const rb = document.getElementById('res-risk-badge');
+  rb.innerHTML = `<span class="risk-badge ${d.riskLevel}" style="margin-top:4px">${d.riskLevel.toUpperCase()} ${d.riskScore}</span>`;
+
+  document.getElementById('res-details').innerHTML = [
+    ['Entity Type',      d.type],
+    ['State / Territory', d.state],
+    ['Suburb / Postcode', `${d.suburb} ${d.postcode}`],
+    ['GST Registered',   d.gstRegistered],
+    ['Registered',       d.registeredDate],
+    ['Last ABR Update',  d.lastUpdated],
+  ].map(([k,v]) => `<div class="detail-row"><span class="detail-key">${k}</span><span class="detail-val">${v}</span></div>`).join('');
+
+  const iconMap = { register:'🟢', cancel:'🔴', namechange:'🔵', flag:'🟡' };
+  document.getElementById('res-history').innerHTML = d.history.map(h => `
+    <div class="history-item">
+      <div class="history-icon ${h.type}">${iconMap[h.type]||'⚪'}</div>
+      <div class="history-body">
+        <div class="history-event">${h.event}</div>
+        <div class="history-date">${h.date}</div>
+      </div>
+    </div>
+  `).join('');
+  document.getElementById('res-history-count').textContent = `${d.history.length} events`;
+
+  if (d.crossRefs.length > 0) {
+    document.getElementById('res-crossref').innerHTML = d.crossRefs.map(cr => `
+      <div class="crossref-item">
+        <div>
+          <div style="font-size:12px;font-weight:500;color:var(--text-primary)">${cr.name}</div>
+          <div class="crossref-abn">${cr.abn} · <span style="color:var(--text-muted)">${cr.reason}</span></div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
+          <span class="dup-status ${cr.status}">${cr.status}</span>
+          <span style="font-family:var(--mono);font-size:10px;color:${riskColor(cr.riskScore >= 80 ? 'critical' : 'high')}">Risk ${cr.riskScore}</span>
+        </div>
+      </div>
+    `).join('');
+  } else {
+    document.getElementById('res-crossref').innerHTML = '<div style="padding:16px;font-family:var(--mono);font-size:12px;color:var(--text-muted)">No cross-references found.</div>';
+  }
+
+  if (d.riskFactors && d.riskFactors.length > 0) {
+    document.getElementById('res-risk-body').innerHTML = d.riskFactors.map(rf => `
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:12px">
+        <span class="risk-badge ${rf.severity}" style="flex-shrink:0">${rf.severity.toUpperCase()}</span>
+        <span style="color:var(--text-secondary)">${rf.label}</span>
+      </div>
+    `).join('');
+  } else {
+    document.getElementById('res-risk-body').innerHTML = '<div style="font-family:var(--mono);font-size:12px;color:var(--accent-green)">✓ No significant risk signals detected for this ABN.</div>';
+  }
+
+  document.getElementById('trackerResults').classList.add('visible');
+}
+
+function clearTracker() {
+  document.getElementById('abnInput').value = '';
+  document.getElementById('trackerResults').classList.remove('visible');
+  document.getElementById('trackerPlaceholder').style.display = 'block';
+}
+
+// ================================================================
+//  EXPORT
+// ================================================================
+function renderExportStats() {
+  const critical = APP.providers.filter(p => p.level === 'critical').length;
+  const high     = APP.providers.filter(p => p.level === 'high').length;
+  document.getElementById('exportStats').innerHTML = `
+    <div class="export-stat"><div class="export-stat-val">${APP.providers.length}</div><div class="export-stat-label">Total Providers</div></div>
+    <div class="export-stat"><div class="export-stat-val" style="color:#ef4444">${critical}</div><div class="export-stat-label">Critical Risk</div></div>
+    <div class="export-stat"><div class="export-stat-val" style="color:#f97316">${high}</div><div class="export-stat-label">High Risk</div></div>
+    <div class="export-stat"><div class="export-stat-val" style="color:#a855f7">${APP.dupContacts.reduce((a,c)=>a+c.entries.length,0)}</div><div class="export-stat-label">ABNs Clustered</div></div>
+  `;
+}
+
+function exportCSV() {
+  const all = document.getElementById('csv-all').checked;
+  const flagged = document.getElementById('csv-flagged').checked;
+
+  let rows = flagged
+    ? APP.providers.filter(p => p.score >= 50)
+    : APP.providers;
+
+  const headers = ['ABN','Provider Name','State','Risk Score','Risk Level','Flags','Suburb','Phone'];
+  const csv = [
+    headers.join(','),
+    ...rows.map(p =>
+      [p.abn, `"${p.name}"`, p.state, p.score, p.level, `"${p.flags.join('|')}"`, p.suburb||'', p.phone||''].join(',')
+    )
+  ].join('\n');
+
+  downloadFile(csv, `ndis-fraud-providers-${dateStr()}.csv`, 'text/csv');
+  showToast('success', `✓ CSV exported — ${rows.length} rows`);
+}
+
+function exportJSON() {
+  const out = {};
+  if (document.getElementById('json-providers').checked)  out.providers  = APP.providers;
+  if (document.getElementById('json-suburbs').checked)    out.suburbs    = APP.suburbs;
+  if (document.getElementById('json-clusters').checked)   out.clusters   = APP.dupContacts;
+  if (document.getElementById('json-meta').checked)       out.meta = {
+    exportedAt: new Date().toISOString(),
+    version: CONFIG.VERSION,
+    dataSource: CONFIG.USE_MOCK ? 'mock' : 'live',
+    totalProviders: APP.providers.length
+  };
+
+  downloadFile(JSON.stringify(out, null, 2), `ndis-fraud-data-${dateStr()}.json`, 'application/json');
+  showToast('success', '✓ JSON exported successfully');
+}
+
+function exportReport() {
+  const critical = APP.providers.filter(p => p.level === 'critical');
+  const rereg    = APP.providers.filter(p => p.flags.includes('reregistered'));
+  const now      = new Date().toLocaleString('en-AU', { timeZone:'Australia/Sydney' });
+
+  let report = `NDIS FRAUD INTELLIGENCE — REFERRAL REPORT
+Generated: ${now} AEST
+Version: ${CONFIG.VERSION}
+Data Source: ${CONFIG.USE_MOCK ? 'Mock (Demo)' : 'Live — NDIS Provider Register + ABR'}
+${'='.repeat(60)}
+
+EXECUTIVE SUMMARY
+-----------------
+Total Providers Monitored: ${APP.providers.length.toLocaleString()}
+Critical Risk Providers:   ${critical.length}
+Re-registration Patterns:  ${rereg.length}
+Duplicate Contact Clusters: ${APP.dupContacts.length}
+Suburb Density Alerts:     ${APP.suburbs.filter(s => s.ratio >= 2).length}
+
+${'='.repeat(60)}
+SECTION 1 — CRITICAL RISK PROVIDERS
+${'='.repeat(60)}
+`;
+
+  critical.forEach((p, i) => {
+    report += `
+${i+1}. ${p.name}
+   ABN:       ${p.abn}
+   State:     ${p.state}
+   Risk Score: ${p.score}/100
+   Flags:      ${p.flags.map(f => FLAG_LABELS[f]).join(', ')}
+   Suburb:     ${p.suburb || 'N/A'}
+`;
+  });
+
+  report += `
+${'='.repeat(60)}
+SECTION 2 — RE-REGISTRATION PATTERNS
+${'='.repeat(60)}
+`;
+
+  rereg.forEach((p, i) => {
+    report += `
+${i+1}. ${p.name} (ABN: ${p.abn})
+   State: ${p.state} | Risk: ${p.score}/100
+`;
+  });
+
+  report += `
+${'='.repeat(60)}
+SECTION 3 — DUPLICATE CONTACT CLUSTERS
+${'='.repeat(60)}
+`;
+
+  APP.dupContacts.forEach((c, i) => {
+    report += `
+Cluster ${i+1}: ${c.contact} (${c.type})
+`;
+    c.entries.forEach(e => {
+      report += `   - ${e.name} | ABN: ${e.abn} | Status: ${e.status}\n`;
+    });
+  });
+
+  report += `
+${'='.repeat(60)}
+SECTION 4 — SUBURB DENSITY ANOMALIES
+${'='.repeat(60)}
+`;
+
+  APP.suburbs.filter(s => s.ratio >= 2).sort((a,b)=>b.ratio-a.ratio).forEach((s,i) => {
+    report += `${i+1}. ${s.name} ${s.state}: ${s.providers} providers (expected ~${s.expected}) — ${s.ratio.toFixed(2)}× ratio\n`;
+  });
+
+  report += `
+${'='.repeat(60)}
+REFERRAL NOTE
+${'='.repeat(60)}
+This report has been generated by the NDIS Fraud Intelligence Platform.
+Suspected fraud can be reported to:
+  - NDIS Fraud Reporting Hotline: 1800 650 717
+  - Email: fraudreporting@ndis.gov.au
+  - Australian Federal Police: www.afp.gov.au
+`;
+
+  downloadFile(report, `ndis-fraud-referral-${dateStr()}.txt`, 'text/plain');
+  showToast('success', '✓ Referral report exported');
+}
+
+function refreshPreview() {
+  const preview = APP.providers.filter(p => p.level === 'critical').slice(0,3);
+  const out = {
+    meta: { exportedAt: new Date().toISOString(), version: CONFIG.VERSION, totalFlagged: APP.providers.filter(p=>p.score>=50).length },
+    critical_providers: preview
+  };
+  document.getElementById('jsonPreview').textContent = JSON.stringify(out, null, 2);
+}
+
+function downloadFile(content, filename, type) {
+  const blob = new Blob([content], { type });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function dateStr() {
+  return new Date().toISOString().split('T')[0];
+}
+
+// ================================================================
+//  TAB SWITCHING
+// ================================================================
+function switchTab(tabId, btnEl) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(tabId).classList.add('active');
+  if (btnEl) btnEl.classList.add('active');
+
+  // Hide overview controls when not on overview
+  document.getElementById('overviewControls').style.display =
+    tabId === 'overview' ? 'flex' : 'none';
+
+  // Lazy-init map
+  if (tabId === 'mapView') initMap();
+}
+
+// ================================================================
+//  HELPERS
+// ================================================================
+function riskColor(level) {
+  const m = { critical:'#ef4444', high:'#f97316', medium:'#f59e0b', low:'#22c55e' };
+  return m[level] || '#8899aa';
+}
+
+function densityColor(ratio) {
+  if (ratio >= 3.5) return 'linear-gradient(90deg,#ef4444,#f97316)';
+  if (ratio >= 2.8) return '#f97316';
+  if (ratio >= 2.0) return '#f59e0b';
+  return '#22c55e';
+}
+
+function markerColor(ratio) {
+  if (ratio >= 3.5) return '#ef4444';
+  if (ratio >= 2.5) return '#f97316';
+  if (ratio >= 1.5) return '#f59e0b';
+  return '#22c55e';
+}
+
+function ratioLabel(ratio) {
+  if (ratio >= 3.5) return 'CRITICAL';
+  if (ratio >= 2.5) return 'HIGH';
+  if (ratio >= 1.5) return 'ELEVATED';
+  return 'NORMAL';
+}
+
+// ================================================================
+//  TOAST
+// ================================================================
+function showToast(type, msg) {
+  const t = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  t.className = `toast ${type} show`;
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+// ================================================================
+//  BOOT
+// ================================================================
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('overviewControls').style.display = 'flex';
+  loadData();
+});
+</script>
+</body>
+</html>
