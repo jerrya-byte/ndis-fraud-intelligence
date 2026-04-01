@@ -1420,33 +1420,45 @@ async function loadData() {
 
   // Live data fetch via Cloudflare Worker
   try {
-    showToast('info', '🔄 Fetching live data from NDIS Provider Register...');
-    const [provRes, densityRes, kpiRes] = await Promise.all([
-      fetch(`${CONFIG.WORKER_URL}/api/providers`),
-      fetch(`${CONFIG.WORKER_URL}/api/density`),
-      fetch(`${CONFIG.WORKER_URL}/api/kpis`)
+    showToast('info', '🔄 Fetching live data...');
+
+    // Fetch all endpoints, surface errors explicitly
+    const fetchJSON = async (path) => {
+      const res = await fetch(`${CONFIG.WORKER_URL}${path}`);
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '');
+        throw new Error(`${path} → HTTP ${res.status}: ${errText.slice(0,200)}`);
+      }
+      return res.json();
+    };
+
+    const [providers, density, kpis] = await Promise.all([
+      fetchJSON('/api/providers'),
+      fetchJSON('/api/density'),
+      fetchJSON('/api/kpis'),
     ]);
 
-    APP.providers   = await provRes.json();
-    const density   = await densityRes.json();
-    APP.suburbs     = density.suburbs;
-    APP.dupContacts = density.clusters;
-    APP.kpis        = await kpiRes.json();
+    APP.providers   = providers;
+    APP.suburbs     = density.suburbs  || [];
+    APP.dupContacts = density.clusters || [];
+    APP.kpis        = kpis;
 
     document.getElementById('dataBadge').className = 'data-source-badge live';
     document.getElementById('dataBadgeText').textContent = 'Live Data';
     document.getElementById('lastUpdated').textContent = `Live — ${new Date().toLocaleString('en-AU',{timeZone:'Australia/Sydney',hour12:false})} AEST`;
-    document.getElementById('footerDataNote').textContent = `Live data from NDIS Provider Register + ABR`;
+    document.getElementById('footerDataNote').textContent = `Live data — NDIS Provider Register + ABS + ABR`;
     showToast('success', '✓ Live data loaded successfully');
     renderAll();
   } catch (e) {
-    console.warn('Worker fetch failed, falling back to mock data:', e);
+    // Show the real error so we can debug it
+    console.error('Worker fetch failed:', e);
+    showToast('error', `⚠ Worker error: ${e.message}`);
+    // Fall back to mock so dashboard is still usable
     APP.providers   = MOCK.providers;
     APP.suburbs     = MOCK.suburbs;
     APP.dupContacts = MOCK.dupContacts;
     APP.activity    = MOCK.activity;
     APP.kpis        = MOCK.kpis;
-    showToast('error', '⚠ Worker unavailable — using mock data');
     renderAll();
   }
 }
