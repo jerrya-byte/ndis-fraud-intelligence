@@ -419,18 +419,32 @@
 
 <script>
 // ================================================================
-//  CONFIG — reuses SecureAuth Entra ID app registration
-//  Just add the NDIS dashboard redirect URI in Azure portal
+//  CONFIG
+//  !! REPLACE THESE TWO VALUES with your Entra app details !!
+//  Find them in: Azure Portal → Entra ID → App registrations
+//    → your SecureAuth app → Overview
 // ================================================================
+const ENTRA_CLIENT_ID = '131f0637-b48c-475b-894f-588e501aa42e';   // Application (client) ID
+const ENTRA_TENANT_ID = 'a3a371db-020d-48f0-8410-b59ac56ccc3e';   // Directory (tenant) ID
+
+// ── Validate placeholders haven't been forgotten ──────────────
+if (ENTRA_CLIENT_ID === 'YOUR_ENTRA_CLIENT_ID' || ENTRA_TENANT_ID === 'YOUR_ENTRA_TENANT_ID') {
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('signInBtn').disabled = true;
+    showStatus('error', '⚙', 'Config required: open login.html and replace YOUR_ENTRA_CLIENT_ID and YOUR_ENTRA_TENANT_ID with your actual Entra app values.');
+  });
+}
+
 const MSAL_CONFIG = {
   auth: {
-    clientId:    'YOUR_ENTRA_CLIENT_ID',       // Same as SecureAuth
-    authority:   'https://login.microsoftonline.com/YOUR_ENTRA_TENANT_ID',
-    redirectUri: window.location.origin + '/ndis-fraud-intelligence/login.html',
+    clientId:              ENTRA_CLIENT_ID,
+    authority:             `https://login.microsoftonline.com/${ENTRA_TENANT_ID}`,
+    redirectUri:           window.location.origin + '/ndis-fraud-intelligence/login.html',
     postLogoutRedirectUri: window.location.origin + '/ndis-fraud-intelligence/login.html',
+    navigateToLoginRequestUrl: true,
   },
   cache: {
-    cacheLocation:      'sessionStorage',
+    cacheLocation:          'sessionStorage',
     storeAuthStateInCookie: false,
   },
   system: {
@@ -447,36 +461,50 @@ const LOGIN_REQUEST = {
   scopes: ['openid', 'profile', 'email', 'User.Read'],
 };
 
-let msalInstance;
+// msalInstance is a Promise during init — signIn() awaits it
+// This prevents "loginRedirect of undefined" when button is clicked early
+let msalReady;
 
 // ================================================================
 //  INIT
 // ================================================================
 async function initMSAL() {
-  try {
-    msalInstance = new msal.PublicClientApplication(MSAL_CONFIG);
-    await msalInstance.initialize();
+  // Disable button until MSAL is ready
+  const btn = document.getElementById('signInBtn');
+  btn.disabled = true;
 
-    // Handle redirect response (fires after Entra redirects back)
-    const result = await msalInstance.handleRedirectPromise();
-    if (result) {
+  showStatus('info', '⏳', 'Initialising secure session...');
+
+  try {
+    const instance = new msal.PublicClientApplication(MSAL_CONFIG);
+    await instance.initialize();
+
+    // Handle redirect response — fires when Entra redirects back after login
+    const result = await instance.handleRedirectPromise();
+
+    // Resolve the promise so signIn() can proceed
+    msalReady = instance;
+    btn.disabled = false;
+
+    if (result && result.account) {
       await handleAuthSuccess(result);
       return;
     }
 
-    // Check if already signed in
-    const accounts = msalInstance.getAllAccounts();
+    // Check if already signed in (cached session)
+    const accounts = instance.getAllAccounts();
     if (accounts.length > 0) {
       await handleAuthSuccess({ account: accounts[0] });
       return;
     }
 
-    // Ready for sign in
+    // Ready — show sign-in prompt
     showStatus('info', 'ℹ', 'Sign in with your Microsoft work account to continue.');
 
   } catch (err) {
     console.error('MSAL init error:', err);
-    showStatus('error', '✕', `Initialisation error: ${err.message}`);
+    showStatus('error', '✕', `Initialisation failed: ${err.message}`);
+    // Don't re-enable button on init failure
   }
 }
 
@@ -485,13 +513,20 @@ async function initMSAL() {
 // ================================================================
 async function signIn() {
   const btn = document.getElementById('signInBtn');
+
+  // Guard: MSAL not ready yet (shouldn't happen — button disabled during init)
+  if (!msalReady) {
+    showStatus('error', '✕', 'Authentication not ready yet — please wait a moment and try again.');
+    return;
+  }
+
   btn.disabled = true;
   btn.innerHTML = `<div class="spinner"></div> Redirecting to Microsoft...`;
   showStatus('info', 'ℹ', 'Redirecting to Microsoft sign-in...');
 
   try {
-    await msalInstance.loginRedirect(LOGIN_REQUEST);
-    // Page redirects — execution stops here
+    await msalReady.loginRedirect(LOGIN_REQUEST);
+    // Execution stops here — page navigates to Microsoft login
   } catch (err) {
     console.error('Login error:', err);
     showStatus('error', '✕', err.message || 'Sign-in failed. Please try again.');
@@ -509,50 +544,45 @@ async function signIn() {
 //  HANDLE AUTH SUCCESS
 // ================================================================
 async function handleAuthSuccess(result) {
-  const account = result.account || result.account;
+  const account = result.account;
   const name    = account.name || account.username;
 
   showStatus('success', '✓', `Signed in as ${name} — redirecting...`);
 
   // Show redirect overlay
-  const overlay = document.getElementById('redirectOverlay');
   document.getElementById('redirectName').textContent = name;
   document.getElementById('redirectMsg').textContent  = 'Access granted — loading dashboard';
-  overlay.classList.add('show');
+  document.getElementById('redirectOverlay').classList.add('show');
 
-  // Store auth state for the dashboard to pick up
-  const authData = {
-    name:     name,
-    username: account.username,
-    tenantId: account.tenantId,
-    oid:      account.localAccountId,
+  // Persist auth state — index.html auth guard reads this
+  sessionStorage.setItem('ndis_auth', JSON.stringify({
+    name,
+    username:   account.username,
+    tenantId:   account.tenantId,
+    oid:        account.localAccountId,
     signedInAt: Date.now(),
-  };
+  }));
 
-  sessionStorage.setItem('ndis_auth', JSON.stringify(authData));
-
-  // Get access token for API calls
+  // Silently acquire an access token for Worker API calls
   try {
-    const tokenResult = await msalInstance.acquireTokenSilent({
-      scopes: ['User.Read'],
+    const tokenResult = await msalReady.acquireTokenSilent({
+      scopes:  ['User.Read'],
       account: account,
     });
     sessionStorage.setItem('ndis_access_token', tokenResult.accessToken);
   } catch (e) {
-    console.warn('Silent token acquire failed (non-fatal):', e);
+    console.warn('Silent token acquire failed (non-fatal):', e.message);
   }
 
-  // Small delay then redirect to dashboard
-  setTimeout(() => {
-    window.location.href = './index.html';
-  }, 1200);
+  // Brief pause then go to dashboard
+  setTimeout(() => { window.location.href = './index.html'; }, 1000);
 }
 
 // ================================================================
 //  HELPERS
 // ================================================================
 function showStatus(type, icon, msg) {
-  const box  = document.getElementById('statusBox');
+  const box = document.getElementById('statusBox');
   box.className = `status-box ${type}`;
   document.getElementById('statusIcon').textContent = icon;
   document.getElementById('statusMsg').textContent  = msg;
