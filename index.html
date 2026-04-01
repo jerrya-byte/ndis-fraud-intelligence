@@ -235,7 +235,7 @@
   .main { padding: 18px 24px; max-width: 1600px; margin: 0 auto; }
 
   /* ===== KPI CARDS ===== */
-  .kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 16px; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
 
   .kpi-card {
     background: var(--bg-card);
@@ -931,16 +931,7 @@
       <div class="kpi-value" id="kpi-flagged">—</div>
       <div class="kpi-change up" id="kpi-flagged-sub">Loading...</div>
     </div>
-    <div class="kpi-card amber">
-      <div class="kpi-label">Duplicate Contacts</div>
-      <div class="kpi-value" id="kpi-dup">—</div>
-      <div class="kpi-change up" id="kpi-dup-sub">Loading...</div>
-    </div>
-    <div class="kpi-card green">
-      <div class="kpi-label">Re-registrations</div>
-      <div class="kpi-value" id="kpi-rereg">—</div>
-      <div class="kpi-change" id="kpi-rereg-sub">Loading...</div>
-    </div>
+
     <div class="kpi-card purple">
       <div class="kpi-label">Density Alerts</div>
       <div class="kpi-value" id="kpi-density">—</div>
@@ -997,24 +988,13 @@
     </div>
   </div>
 
-  <!-- Suburb Density + Dup Contacts -->
-  <div class="g2">
-    <div class="panel">
+      <!-- Suburb Density -->
+    <div class="panel" style="margin-bottom:14px">
       <div class="panel-header">
         <div class="panel-title"><span class="ptd amber"></span>Provider Density vs Expected Population</div>
       </div>
       <div id="suburbList"></div>
     </div>
-    <div class="panel">
-      <div class="panel-header">
-        <div class="panel-title"><span class="ptd purple"></span>Duplicate Contact Clusters</div>
-        <span style="font-family:var(--mono);font-size:10px;color:var(--text-muted)">Same phone/email → multiple ABNs</span>
-      </div>
-      <div class="panel-body" style="padding:10px">
-        <div id="dupContactList"></div>
-      </div>
-    </div>
-  </div>
 
   <!-- Charts Row 2 -->
   <div class="g2">
@@ -1471,7 +1451,6 @@ function renderAll() {
   renderKPIs();
   renderTable(APP.filtered);
   renderSuburbs(APP.suburbs);
-  renderDupContacts(APP.dupContacts);
   renderActivityFeed(APP.activity);
   if (!APP.chartsInit) { initCharts(); APP.chartsInit = true; }
   renderExportStats();
@@ -1485,13 +1464,9 @@ function renderKPIs() {
   const k = APP.kpis;
   document.getElementById('kpi-total').textContent     = (k.total || 0).toLocaleString();
   document.getElementById('kpi-flagged').textContent   = (k.flagged || 0).toLocaleString();
-  document.getElementById('kpi-dup').textContent       = (k.dup || 0).toLocaleString();
-  document.getElementById('kpi-rereg').textContent     = (k.rereg || 0).toLocaleString();
   document.getElementById('kpi-density').textContent   = (k.density || 0).toLocaleString();
   document.getElementById('kpi-total-sub').textContent   = 'Across all states';
-  document.getElementById('kpi-flagged-sub').textContent = '↑ 14 this month';
-  document.getElementById('kpi-dup-sub').textContent     = '↑ 6 new clusters';
-  document.getElementById('kpi-rereg-sub').textContent   = 'Same operator, new ABN';
+  document.getElementById('kpi-flagged-sub').textContent = '~2.6% of total (FFT estimate)';
   document.getElementById('kpi-density-sub').textContent = 'Suburbs over-indexed';
   document.getElementById('risk-dist-badge').textContent = `${k.flagged || 0} flagged`;
 }
@@ -1939,7 +1914,7 @@ function renderExportStats() {
     <div class="export-stat"><div class="export-stat-val">${APP.providers.length}</div><div class="export-stat-label">Total Providers</div></div>
     <div class="export-stat"><div class="export-stat-val" style="color:#ef4444">${critical}</div><div class="export-stat-label">Critical Risk</div></div>
     <div class="export-stat"><div class="export-stat-val" style="color:#f97316">${high}</div><div class="export-stat-label">High Risk</div></div>
-    <div class="export-stat"><div class="export-stat-val" style="color:#a855f7">${APP.dupContacts.reduce((a,c)=>a+c.entries.length,0)}</div><div class="export-stat-label">ABNs Clustered</div></div>
+    <div class="export-stat"><div class="export-stat-val" style="color:#22c55e">${APP.providers.filter(p=>p.level==='low').length}</div><div class="export-stat-label">Low Risk</div></div>
   `;
 }
 
@@ -1995,7 +1970,6 @@ EXECUTIVE SUMMARY
 Total Providers Monitored: ${APP.providers.length.toLocaleString()}
 Critical Risk Providers:   ${critical.length}
 Re-registration Patterns:  ${rereg.length}
-Duplicate Contact Clusters: ${APP.dupContacts.length}
 Suburb Density Alerts:     ${APP.suburbs.filter(s => s.ratio >= 2).length}
 
 ${'='.repeat(60)}
@@ -2025,21 +1999,6 @@ ${'='.repeat(60)}
 ${i+1}. ${p.name} (ABN: ${p.abn})
    State: ${p.state} | Risk: ${p.score}/100
 `;
-  });
-
-  report += `
-${'='.repeat(60)}
-SECTION 3 — DUPLICATE CONTACT CLUSTERS
-${'='.repeat(60)}
-`;
-
-  APP.dupContacts.forEach((c, i) => {
-    report += `
-Cluster ${i+1}: ${c.contact} (${c.type})
-`;
-    c.entries.forEach(e => {
-      report += `   - ${e.name} | ABN: ${e.abn} | Status: ${e.status}\n`;
-    });
   });
 
   report += `
