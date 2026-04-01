@@ -5,576 +5,273 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NDIS Fraud Intelligence — Sign In</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
-<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js" crossorigin="anonymous"></script>
 <style>
   :root {
-    --bg:        #0a0d12;
-    --panel:     #0f1420;
-    --card:      #141a28;
-    --border:    #1e2d45;
-    --blue:      #1e90ff;
-    --amber:     #f59e0b;
-    --green:     #22c55e;
-    --red:       #ef4444;
-    --text:      #e2e8f0;
-    --muted:     #4a5568;
-    --secondary: #8899aa;
-    --mono:      'IBM Plex Mono', monospace;
-    --sans:      'IBM Plex Sans', sans-serif;
+    --bg: #0a0d12; --card: #141a28; --border: #1e2d45;
+    --blue: #1e90ff; --amber: #f59e0b; --green: #22c55e; --red: #ef4444;
+    --text: #e2e8f0; --muted: #4a5568; --secondary: #8899aa;
+    --mono: 'IBM Plex Mono', monospace; --sans: 'IBM Plex Sans', sans-serif;
   }
-
   * { box-sizing: border-box; margin: 0; padding: 0; }
-
   body {
-    font-family: var(--sans);
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    overflow: hidden;
+    font-family: var(--sans); background: var(--bg); color: var(--text);
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    position: relative; overflow: hidden;
   }
-
-  /* ── Background grid ── */
   body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background-image:
-      linear-gradient(rgba(30,144,255,0.04) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(30,144,255,0.04) 1px, transparent 1px);
-    background-size: 48px 48px;
-    pointer-events: none;
+    content: ''; position: fixed; inset: 0;
+    background-image: linear-gradient(rgba(30,144,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(30,144,255,0.04) 1px, transparent 1px);
+    background-size: 48px 48px; pointer-events: none;
   }
-
-  /* ── Scan line ── */
-  body::after {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background: repeating-linear-gradient(
-      0deg, transparent, transparent 2px,
-      rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px
-    );
-    pointer-events: none;
-    z-index: 9999;
-  }
-
-  /* ── Glow blobs ── */
-  .blob {
-    position: fixed;
-    border-radius: 50%;
-    filter: blur(80px);
-    opacity: 0.08;
-    pointer-events: none;
-  }
+  .blob { position: fixed; border-radius: 50%; filter: blur(80px); opacity: 0.08; pointer-events: none; }
   .blob-1 { width: 500px; height: 500px; background: #1e90ff; top: -150px; left: -100px; }
   .blob-2 { width: 400px; height: 400px; background: #f59e0b; bottom: -100px; right: -80px; }
-
-  /* ── Card ── */
   .login-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    width: 420px;
-    padding: 40px;
-    position: relative;
-    z-index: 10;
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    width: 420px; padding: 40px; position: relative; z-index: 10;
     box-shadow: 0 24px 80px rgba(0,0,0,0.6);
     animation: cardIn 0.5s cubic-bezier(0.16,1,0.3,1) both;
   }
-
-  @keyframes cardIn {
-    from { opacity:0; transform: translateY(20px) scale(0.97); }
-    to   { opacity:1; transform: translateY(0)    scale(1); }
-  }
-
-  /* ── Top accent bar ── */
-  .card-accent {
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 2px;
-    background: linear-gradient(90deg, var(--blue), #0055cc, var(--amber));
-    border-radius: 12px 12px 0 0;
-  }
-
-  /* ── Logo ── */
-  .logo-wrap {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    margin-bottom: 32px;
-  }
-
-  .logo-mark {
-    width: 44px; height: 44px;
-    background: linear-gradient(135deg, var(--blue), #0055cc);
-    border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    font-family: var(--mono); font-size: 18px; font-weight: 600; color: white;
-    flex-shrink: 0;
-    box-shadow: 0 4px 16px rgba(30,144,255,0.3);
-  }
-
-  .logo-text-title {
-    font-family: var(--mono);
-    font-size: 14px; font-weight: 600;
-    letter-spacing: 0.02em;
-    line-height: 1.2;
-  }
-
-  .logo-text-sub {
-    font-family: var(--mono);
-    font-size: 10px;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    margin-top: 2px;
-  }
-
-  /* ── Heading ── */
-  .card-heading {
-    font-size: 22px;
-    font-weight: 600;
-    margin-bottom: 6px;
-    letter-spacing: -0.01em;
-  }
-
-  .card-sub {
-    font-size: 13px;
-    color: var(--secondary);
-    margin-bottom: 32px;
-    line-height: 1.5;
-  }
-
-  /* ── Access tier badges ── */
-  .access-tiers {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-bottom: 28px;
-    padding: 14px;
-    background: rgba(255,255,255,0.02);
-    border: 1px solid var(--border);
-    border-radius: 7px;
-  }
-
-  .access-tier-title {
-    font-family: var(--mono);
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    color: var(--muted);
-    margin-bottom: 6px;
-  }
-
-  .tier-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 12px;
-    color: var(--secondary);
-  }
-
-  .tier-dot {
-    width: 6px; height: 6px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-
-  /* ── Sign-in button ── */
-  .btn-signin {
-    width: 100%;
-    padding: 13px 20px;
-    background: var(--blue);
-    color: white;
-    border: none;
-    border-radius: 7px;
-    font-family: var(--mono);
-    font-size: 13px;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    transition: all 0.2s;
-    position: relative;
-    overflow: hidden;
-    margin-bottom: 12px;
-  }
-
-  .btn-signin:hover:not(:disabled) {
-    background: #0077ee;
-    box-shadow: 0 4px 20px rgba(30,144,255,0.35);
-    transform: translateY(-1px);
-  }
-
-  .btn-signin:active:not(:disabled) { transform: translateY(0); }
-
-  .btn-signin:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-    transform: none;
-  }
-
-  .ms-logo {
-    width: 18px; height: 18px;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 2px;
-    flex-shrink: 0;
-  }
-
-  .ms-logo div { border-radius: 1px; }
-  .ms-q1 { background: #f25022; }
-  .ms-q2 { background: #7fba00; }
-  .ms-q3 { background: #00a4ef; }
-  .ms-q4 { background: #ffb900; }
-
-  /* ── Status ── */
-  .status-box {
-    display: none;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 14px;
-    border-radius: 6px;
-    font-family: var(--mono);
-    font-size: 11px;
-    margin-bottom: 14px;
-    line-height: 1.4;
-  }
-
+  @keyframes cardIn { from { opacity:0; transform: translateY(20px) scale(0.97); } to { opacity:1; transform: translateY(0) scale(1); } }
+  .card-accent { position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--blue), #0055cc, var(--amber)); border-radius: 12px 12px 0 0; }
+  .logo-wrap { display: flex; align-items: center; gap: 14px; margin-bottom: 32px; }
+  .logo-mark { width: 44px; height: 44px; background: linear-gradient(135deg, var(--blue), #0055cc); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 18px; font-weight: 600; color: white; box-shadow: 0 4px 16px rgba(30,144,255,0.3); flex-shrink: 0; }
+  .logo-text-title { font-family: var(--mono); font-size: 14px; font-weight: 600; letter-spacing: 0.02em; }
+  .logo-text-sub { font-family: var(--mono); font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-top: 2px; }
+  .card-heading { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+  .card-sub { font-size: 13px; color: var(--secondary); margin-bottom: 28px; line-height: 1.5; }
+  .access-tiers { background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 7px; padding: 14px; margin-bottom: 24px; }
+  .access-tier-title { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin-bottom: 8px; }
+  .tier-row { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--secondary); margin-bottom: 5px; }
+  .tier-row:last-child { margin-bottom: 0; }
+  .tier-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .status-box { display: none; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 6px; font-family: var(--mono); font-size: 11px; margin-bottom: 14px; line-height: 1.4; }
   .status-box.info    { background: rgba(30,144,255,0.1);  border: 1px solid rgba(30,144,255,0.3);  color: var(--blue);  display: flex; }
   .status-box.success { background: rgba(34,197,94,0.1);   border: 1px solid rgba(34,197,94,0.3);   color: var(--green); display: flex; }
   .status-box.error   { background: rgba(239,68,68,0.1);   border: 1px solid rgba(239,68,68,0.3);   color: var(--red);   display: flex; }
-
-  .status-icon { font-size: 14px; flex-shrink: 0; }
-
-  /* ── Spinner ── */
-  .spinner {
-    width: 16px; height: 16px;
-    border: 2px solid rgba(255,255,255,0.3);
-    border-top-color: white;
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-    flex-shrink: 0;
-  }
+  .btn-signin { width: 100%; padding: 13px 20px; background: var(--blue); color: white; border: none; border-radius: 7px; font-family: var(--mono); font-size: 13px; font-weight: 600; letter-spacing: 0.04em; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.2s; margin-bottom: 12px; }
+  .btn-signin:hover:not(:disabled) { background: #0077ee; box-shadow: 0 4px 20px rgba(30,144,255,0.35); transform: translateY(-1px); }
+  .btn-signin:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+  .ms-logo { width: 18px; height: 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 2px; flex-shrink: 0; }
+  .ms-logo div { border-radius: 1px; }
+  .ms-q1 { background: #f25022; } .ms-q2 { background: #7fba00; } .ms-q3 { background: #00a4ef; } .ms-q4 { background: #ffb900; }
+  .spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.7s linear infinite; flex-shrink: 0; }
   @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* ── Divider ── */
-  .divider {
-    border: none;
-    border-top: 1px solid var(--border);
-    margin: 24px 0;
-  }
-
-  /* ── Footer ── */
-  .card-footer {
-    font-family: var(--mono);
-    font-size: 10px;
-    color: var(--muted);
-    text-align: center;
-    line-height: 1.6;
-  }
-
+  hr.divider { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+  .card-footer { font-family: var(--mono); font-size: 10px; color: var(--muted); text-align: center; line-height: 1.6; }
   .card-footer a { color: var(--secondary); text-decoration: none; }
   .card-footer a:hover { color: var(--blue); }
-
-  /* ── Live indicator ── */
-  .live-indicator {
-    position: fixed;
-    top: 20px; right: 24px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-family: var(--mono);
-    font-size: 10px;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    z-index: 100;
-  }
-
-  .live-dot {
-    width: 6px; height: 6px;
-    border-radius: 50%;
-    background: var(--blue);
-    animation: pulse-dot 2s infinite;
-  }
-  @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.3} }
-
-  /* ── Redirect overlay ── */
-  .redirect-overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: var(--bg);
-    z-index: 9000;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 20px;
-  }
-
+  .redirect-overlay { display: none; position: fixed; inset: 0; background: var(--bg); z-index: 9000; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
   .redirect-overlay.show { display: flex; }
-
-  .redirect-spinner {
-    width: 40px; height: 40px;
-    border: 2px solid var(--border);
-    border-top-color: var(--blue);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
-
-  .redirect-text {
-    font-family: var(--mono);
-    font-size: 12px;
-    color: var(--secondary);
-    text-align: center;
-    line-height: 1.6;
-  }
-
+  .redirect-spinner { width: 40px; height: 40px; border: 2px solid var(--border); border-top-color: var(--blue); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  .redirect-text { font-family: var(--mono); font-size: 12px; color: var(--secondary); text-align: center; line-height: 1.6; }
   .redirect-text strong { color: var(--text); display: block; margin-bottom: 4px; font-size: 14px; }
 </style>
 </head>
 <body>
-
 <div class="blob blob-1"></div>
 <div class="blob blob-2"></div>
 
-<div class="live-indicator">
-  <span class="live-dot"></span>
-  Entra ID Protected
-</div>
-
 <div class="login-card">
   <div class="card-accent"></div>
-
   <div class="logo-wrap">
-    <div class="logo-mark">N↯</div>
+    <div class="logo-mark">N!</div>
     <div>
       <div class="logo-text-title">NDIS FRAUD INTELLIGENCE</div>
       <div class="logo-text-sub">Provider Risk Analysis Platform</div>
     </div>
   </div>
-
   <div class="card-heading">Authorised Access Only</div>
   <div class="card-sub">Sign in with your Microsoft work account to access the fraud intelligence dashboard.</div>
-
   <div class="access-tiers">
     <div class="access-tier-title">Access Requirements</div>
-    <div class="tier-row">
-      <div class="tier-dot" style="background:#22c55e"></div>
-      <span>Active Microsoft Entra ID account</span>
-    </div>
-    <div class="tier-row">
-      <div class="tier-dot" style="background:#22c55e"></div>
-      <span>Authorised organisation membership</span>
-    </div>
-    <div class="tier-row">
-      <div class="tier-dot" style="background:#f59e0b"></div>
-      <span>Data classification: OFFICIAL — SENSITIVE</span>
-    </div>
+    <div class="tier-row"><div class="tier-dot" style="background:#22c55e"></div><span>Active Microsoft Entra ID account</span></div>
+    <div class="tier-row"><div class="tier-dot" style="background:#22c55e"></div><span>Authorised organisation membership</span></div>
+    <div class="tier-row"><div class="tier-dot" style="background:#f59e0b"></div><span>Data classification: OFFICIAL - SENSITIVE</span></div>
   </div>
-
-  <!-- Status messages -->
   <div class="status-box" id="statusBox">
-    <span class="status-icon" id="statusIcon">ℹ</span>
-    <span id="statusMsg">Initialising...</span>
+    <span id="statusIcon"></span>
+    <span id="statusMsg"></span>
   </div>
-
-  <!-- Sign in button -->
   <button class="btn-signin" id="signInBtn" onclick="signIn()">
-    <div class="ms-logo">
-      <div class="ms-q1"></div><div class="ms-q2"></div>
-      <div class="ms-q3"></div><div class="ms-q4"></div>
-    </div>
+    <div class="ms-logo"><div class="ms-q1"></div><div class="ms-q2"></div><div class="ms-q3"></div><div class="ms-q4"></div></div>
     Sign in with Microsoft
   </button>
-
   <hr class="divider">
-
   <div class="card-footer">
-    This system is for authorised users only.<br>
-    All access is logged and monitored.<br><br>
-    <a href="https://www.ndis.gov.au/fraud-reporting" target="_blank">Report NDIS Fraud</a>
-    &nbsp;·&nbsp;
+    This system is for authorised users only. All access is logged and monitored.<br><br>
+    <a href="https://www.ndis.gov.au/fraud-reporting" target="_blank">Report NDIS Fraud</a> &nbsp;·&nbsp;
     <a href="mailto:fraudreporting@ndis.gov.au">Contact</a>
   </div>
 </div>
 
-<!-- Redirect overlay -->
 <div class="redirect-overlay" id="redirectOverlay">
   <div class="redirect-spinner"></div>
   <div class="redirect-text">
     <strong id="redirectName">Authenticating...</strong>
-    <span id="redirectMsg">Verifying your access — redirecting to dashboard</span>
+    <span id="redirectMsg">Verifying your access</span>
   </div>
 </div>
 
 <script>
 // ================================================================
-//  CONFIG
-//  !! REPLACE THESE TWO VALUES with your Entra app details !!
-//  Find them in: Azure Portal → Entra ID → App registrations
-//    → your SecureAuth app → Overview
+//  CONFIG — no external library needed
 // ================================================================
-const ENTRA_CLIENT_ID = '131f0637-b48c-475b-894f-588e501aa42e';
-const ENTRA_TENANT_ID = 'a3a371db-020d-48f0-8410-b59ac56ccc3e';
-
-const MSAL_CONFIG = {
-  auth: {
-    clientId:              ENTRA_CLIENT_ID,
-    authority:             `https://login.microsoftonline.com/${ENTRA_TENANT_ID}`,
-    redirectUri:           window.location.origin + '/ndis-fraud-intelligence/login.html',
-    postLogoutRedirectUri: window.location.origin + '/ndis-fraud-intelligence/login.html',
-    navigateToLoginRequestUrl: true,
-  },
-  cache: {
-    cacheLocation:          'sessionStorage',
-    storeAuthStateInCookie: false,
-  },
-  system: {
-    loggerOptions: {
-      loggerCallback: (level, msg, containsPii) => {
-        if (!containsPii && level <= 1) console.log('[MSAL]', msg);
-      },
-      logLevel: 1,
-    }
-  }
-};
-
-const LOGIN_REQUEST = {
-  scopes: ['openid', 'profile', 'email', 'User.Read'],
-};
-
-// msalInstance is a Promise during init — signIn() awaits it
-// This prevents "loginRedirect of undefined" when button is clicked early
-let msalReady;
+var TENANT_ID    = 'a3a371db-020d-48f0-8410-b59ac56ccc3e';
+var CLIENT_ID    = '131f0637-b48c-475b-894f-588e501aa42e';
+var SCOPES       = 'openid profile email User.Read';
+var REDIRECT_URI = window.location.origin + '/ndis-fraud-intelligence/login.html';
+var AUTHORITY    = 'https://login.microsoftonline.com/' + TENANT_ID + '/oauth2/v2.0/';
 
 // ================================================================
-//  INIT
+//  PKCE helpers (built into every modern browser — no library needed)
 // ================================================================
-async function initMSAL() {
-  // Disable button until MSAL is ready
-  const btn = document.getElementById('signInBtn');
-  btn.disabled = true;
+function randomString(len) {
+  var arr = new Uint8Array(len);
+  crypto.getRandomValues(arr);
+  return Array.from(arr, function(b){ return ('0'+(b&0xff).toString(16)).slice(-2); }).join('').slice(0,len);
+}
 
-  showStatus('info', '⏳', 'Initialising secure session...');
-
-  try {
-    const instance = new msal.PublicClientApplication(MSAL_CONFIG);
-
-    // Handle redirect response — fires when Entra redirects back after login
-    const result = await instance.handleRedirectPromise();
-
-    // Resolve the promise so signIn() can proceed
-    msalReady = instance;
-    btn.disabled = false;
-
-    if (result && result.account) {
-      await handleAuthSuccess(result);
-      return;
-    }
-
-    // Check if already signed in (cached session)
-    const accounts = instance.getAllAccounts();
-    if (accounts.length > 0) {
-      await handleAuthSuccess({ account: accounts[0] });
-      return;
-    }
-
-    // Ready — show sign-in prompt
-    showStatus('info', 'ℹ', 'Sign in with your Microsoft work account to continue.');
-
-  } catch (err) {
-    console.error('MSAL init error:', err);
-    showStatus('error', '✕', `Initialisation failed: ${err.message}`);
-    // Don't re-enable button on init failure
-  }
+async function pkceChallenge(verifier) {
+  var data   = new TextEncoder().encode(verifier);
+  var digest = await crypto.subtle.digest('SHA-256', data);
+  return btoa(String.fromCharCode.apply(null, new Uint8Array(digest)))
+    .replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
 }
 
 // ================================================================
 //  SIGN IN
 // ================================================================
 async function signIn() {
-  const btn = document.getElementById('signInBtn');
-
-  // Guard: MSAL not ready yet (shouldn't happen — button disabled during init)
-  if (!msalReady) {
-    showStatus('error', '✕', 'Authentication not ready yet — please wait a moment and try again.');
-    return;
-  }
-
+  var btn = document.getElementById('signInBtn');
   btn.disabled = true;
-  btn.innerHTML = `<div class="spinner"></div> Redirecting to Microsoft...`;
-  showStatus('info', 'ℹ', 'Redirecting to Microsoft sign-in...');
+  btn.innerHTML = '<div class="spinner"></div> Redirecting to Microsoft...';
+  showStatus('info', 'i', 'Redirecting to Microsoft sign-in...');
 
   try {
-    await msalReady.loginRedirect(LOGIN_REQUEST);
-    // Execution stops here — page navigates to Microsoft login
-  } catch (err) {
-    console.error('Login error:', err);
-    showStatus('error', '✕', err.message || 'Sign-in failed. Please try again.');
+    var verifier   = randomString(64);
+    var challenge  = await pkceChallenge(verifier);
+    var state      = randomString(16);
+
+    sessionStorage.setItem('pkce_verifier', verifier);
+    sessionStorage.setItem('pkce_state',    state);
+
+    var params = new URLSearchParams({
+      client_id:             CLIENT_ID,
+      response_type:         'code',
+      redirect_uri:          REDIRECT_URI,
+      response_mode:         'query',
+      scope:                 SCOPES,
+      state:                 state,
+      code_challenge:        challenge,
+      code_challenge_method: 'S256',
+    });
+
+    window.location.href = AUTHORITY + 'authorize?' + params.toString();
+
+  } catch(err) {
+    showStatus('error', 'X', 'Failed to start sign-in: ' + err.message);
     btn.disabled = false;
-    btn.innerHTML = `
-      <div class="ms-logo">
-        <div class="ms-q1"></div><div class="ms-q2"></div>
-        <div class="ms-q3"></div><div class="ms-q4"></div>
-      </div>
-      Sign in with Microsoft`;
+    btn.innerHTML = '<div class="ms-logo"><div class="ms-q1"></div><div class="ms-q2"></div><div class="ms-q3"></div><div class="ms-q4"></div></div>Sign in with Microsoft';
   }
 }
 
 // ================================================================
-//  HANDLE AUTH SUCCESS
+//  HANDLE RETURN FROM MICROSOFT
 // ================================================================
-async function handleAuthSuccess(result) {
-  const account = result.account;
-  const name    = account.name || account.username;
+async function handleRedirect() {
+  var params   = new URLSearchParams(window.location.search);
+  var code     = params.get('code');
+  var state    = params.get('state');
+  var error    = params.get('error');
+  var errorMsg = params.get('error_description');
 
-  showStatus('success', '✓', `Signed in as ${name} — redirecting...`);
-
-  // Show redirect overlay
-  document.getElementById('redirectName').textContent = name;
-  document.getElementById('redirectMsg').textContent  = 'Access granted — loading dashboard';
-  document.getElementById('redirectOverlay').classList.add('show');
-
-  // Persist auth state — index.html auth guard reads this
-  sessionStorage.setItem('ndis_auth', JSON.stringify({
-    name,
-    username:   account.username,
-    tenantId:   account.tenantId,
-    oid:        account.localAccountId,
-    signedInAt: Date.now(),
-  }));
-
-  // Silently acquire an access token for Worker API calls
-  try {
-    const tokenResult = await msalReady.acquireTokenSilent({
-      scopes:  ['User.Read'],
-      account: account,
-    });
-    sessionStorage.setItem('ndis_access_token', tokenResult.accessToken);
-  } catch (e) {
-    console.warn('Silent token acquire failed (non-fatal):', e.message);
+  if (error) {
+    showStatus('error', 'X', 'Microsoft error: ' + (errorMsg || error));
+    return;
   }
 
-  // Brief pause then go to dashboard
-  setTimeout(() => { window.location.href = './index.html'; }, 1000);
+  if (!code) {
+    showStatus('info', 'i', 'Sign in with your Microsoft work account to continue.');
+    return;
+  }
+
+  if (state !== sessionStorage.getItem('pkce_state')) {
+    showStatus('error', 'X', 'Security error: state mismatch. Please try again.');
+    return;
+  }
+
+  var verifier = sessionStorage.getItem('pkce_verifier');
+  if (!verifier) {
+    showStatus('error', 'X', 'Session error: please try signing in again.');
+    return;
+  }
+
+  // Clean up URL
+  window.history.replaceState({}, document.title, window.location.pathname);
+  document.getElementById('signInBtn').disabled = true;
+  showStatus('info', '...', 'Verifying credentials with Microsoft...');
+
+  try {
+    var tokenRes = await fetch(AUTHORITY + 'token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id:     CLIENT_ID,
+        grant_type:    'authorization_code',
+        code:          code,
+        redirect_uri:  REDIRECT_URI,
+        code_verifier: verifier,
+        scope:         SCOPES,
+      }).toString(),
+    });
+
+    var token = await tokenRes.json();
+
+    if (!tokenRes.ok || token.error) {
+      throw new Error(token.error_description || token.error || 'Token exchange failed (HTTP ' + tokenRes.status + ')');
+    }
+
+    // Decode ID token — no library needed, it's just base64
+    var payload = JSON.parse(atob(token.id_token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+
+    var name     = payload.name || payload.preferred_username || 'User';
+    var username = payload.preferred_username || payload.email || '';
+
+    sessionStorage.removeItem('pkce_verifier');
+    sessionStorage.removeItem('pkce_state');
+
+    sessionStorage.setItem('ndis_auth', JSON.stringify({
+      name: name, username: username,
+      tenantId: payload.tid || TENANT_ID,
+      oid: payload.oid || '',
+      signedInAt: Date.now(),
+    }));
+
+    if (token.access_token) {
+      sessionStorage.setItem('ndis_access_token', token.access_token);
+    }
+
+    showStatus('success', 'OK', 'Signed in as ' + name + ' — redirecting...');
+    document.getElementById('redirectName').textContent = name;
+    document.getElementById('redirectMsg').textContent  = 'Access granted — loading dashboard';
+    document.getElementById('redirectOverlay').classList.add('show');
+
+    setTimeout(function(){ window.location.href = './index.html'; }, 1000);
+
+  } catch(err) {
+    console.error('Token error:', err);
+    showStatus('error', 'X', 'Authentication failed: ' + err.message);
+    document.getElementById('signInBtn').disabled = false;
+  }
 }
 
 // ================================================================
 //  HELPERS
 // ================================================================
 function showStatus(type, icon, msg) {
-  const box = document.getElementById('statusBox');
-  box.className = `status-box ${type}`;
+  var box = document.getElementById('statusBox');
+  box.className = 'status-box ' + type;
   document.getElementById('statusIcon').textContent = icon;
   document.getElementById('statusMsg').textContent  = msg;
 }
@@ -582,14 +279,20 @@ function showStatus(type, icon, msg) {
 // ================================================================
 //  BOOT
 // ================================================================
-document.addEventListener('DOMContentLoaded', () => {
-  // Verify MSAL loaded from CDN before initialising
-  if (typeof msal === 'undefined') {
-    showStatus('error', '✕', 'Failed to load Microsoft Authentication Library. Check your internet connection and refresh.');
-    console.error('MSAL not defined — CDN script may have failed to load.');
-    return;
-  }
-  initMSAL();
+document.addEventListener('DOMContentLoaded', function() {
+  // Already signed in?
+  try {
+    var auth = JSON.parse(sessionStorage.getItem('ndis_auth') || 'null');
+    if (auth && auth.signedInAt && (Date.now() - auth.signedInAt) < 8*60*60*1000) {
+      document.getElementById('redirectName').textContent = auth.name;
+      document.getElementById('redirectMsg').textContent  = 'Already signed in — loading dashboard';
+      document.getElementById('redirectOverlay').classList.add('show');
+      setTimeout(function(){ window.location.href = './index.html'; }, 800);
+      return;
+    }
+  } catch(e) {}
+
+  handleRedirect();
 });
 </script>
 </body>
