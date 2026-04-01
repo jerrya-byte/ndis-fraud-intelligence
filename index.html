@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="https://unpkg.com/@azure/msal-browser@3.28.1/lib/msal-browser.min.js"></script>
+<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js" crossorigin="anonymous"></script>
 
 <!-- ── Auth Guard: redirects to login.html if not authenticated ── -->
 <script>
@@ -1279,9 +1279,9 @@
 //  CONFIG — Update WORKER_URL after deploying your Cloudflare Worker
 // ================================================================
 const CONFIG = {
-  WORKER_URL: '',          // e.g. 'https://ndis-fraud.yourusername.workers.dev'
-  USE_MOCK: true,          // Auto-set to false when WORKER_URL is populated
-  VERSION: '0.2.0'
+  WORKER_URL: 'https://ndis-fraud-intelligence.jerrya-byte.workers.dev',
+  USE_MOCK: false,
+  VERSION: '0.3.0'
 };
 
 // Auto-detect whether to use mock or live data
