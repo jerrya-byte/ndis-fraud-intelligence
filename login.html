@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NDIS Fraud Intelligence — Sign In</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
-<script src="https://alcdn.msauth.net/browser/3.0.0/js/msal-browser.min.js"></script>
+<script src="https://unpkg.com/@azure/msal-browser@3.28.1/lib/msal-browser.min.js"></script>
 <style>
   :root {
     --bg:        #0a0d12;
@@ -424,8 +424,8 @@
 //  Find them in: Azure Portal → Entra ID → App registrations
 //    → your SecureAuth app → Overview
 // ================================================================
-const ENTRA_CLIENT_ID = '131f0637-b48c-475b-894f-588e501aa42e';   // Application (client) ID
-const ENTRA_TENANT_ID = 'a3a371db-020d-48f0-8410-b59ac56ccc3e';   // Directory (tenant) ID
+const ENTRA_CLIENT_ID = 'YOUR_ENTRA_CLIENT_ID';   // Application (client) ID
+const ENTRA_TENANT_ID = 'YOUR_ENTRA_TENANT_ID';   // Directory (tenant) ID
 
 // ── Validate placeholders haven't been forgotten ──────────────
 if (ENTRA_CLIENT_ID === 'YOUR_ENTRA_CLIENT_ID' || ENTRA_TENANT_ID === 'YOUR_ENTRA_TENANT_ID') {
@@ -591,7 +591,15 @@ function showStatus(type, icon, msg) {
 // ================================================================
 //  BOOT
 // ================================================================
-document.addEventListener('DOMContentLoaded', initMSAL);
+document.addEventListener('DOMContentLoaded', () => {
+  // Verify MSAL loaded from CDN before initialising
+  if (typeof msal === 'undefined') {
+    showStatus('error', '✕', 'Failed to load Microsoft Authentication Library. Check your internet connection and refresh.');
+    console.error('MSAL not defined — CDN script may have failed to load.');
+    return;
+  }
+  initMSAL();
+});
 </script>
 </body>
 </html>
