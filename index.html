@@ -8,6 +8,33 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://alcdn.msauth.net/browser/3.0.0/js/msal-browser.min.js"></script>
+
+<!-- ── Auth Guard: redirects to login.html if not authenticated ── -->
+<script>
+(function() {
+  const LOGIN_PAGE = './login.html';
+
+  // Check sessionStorage for auth data set by login.html
+  const raw = sessionStorage.getItem('ndis_auth');
+  if (!raw) {
+    window.location.replace(LOGIN_PAGE);
+    return;
+  }
+
+  try {
+    const auth = JSON.parse(raw);
+    // Expire session after 8 hours
+    if (!auth.signedInAt || (Date.now() - auth.signedInAt) > 8 * 60 * 60 * 1000) {
+      sessionStorage.removeItem('ndis_auth');
+      sessionStorage.removeItem('ndis_access_token');
+      window.location.replace(LOGIN_PAGE);
+    }
+  } catch {
+    window.location.replace(LOGIN_PAGE);
+  }
+})();
+</script>
 
 <style>
   :root {
@@ -842,6 +869,13 @@
       <span id="dataBadgeText">Mock Data</span>
     </div>
     <div class="last-updated" id="lastUpdated">Last updated: —</div>
+    <div style="display:flex;align-items:center;gap:10px;border-left:1px solid var(--border);padding-left:14px;margin-left:4px">
+      <div style="text-align:right">
+        <div style="font-family:var(--mono);font-size:11px;color:var(--text-primary)" id="headerUserName">—</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text-muted)" id="headerUserEmail">—</div>
+      </div>
+      <button onclick="signOut()" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);color:#ef4444;font-family:var(--mono);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;padding:4px 10px;border-radius:4px;cursor:pointer;white-space:nowrap">Sign Out</button>
+    </div>
   </div>
 </header>
 
@@ -1245,7 +1279,7 @@
 //  CONFIG — Update WORKER_URL after deploying your Cloudflare Worker
 // ================================================================
 const CONFIG = {
-  WORKER_URL: 'https://ndis-fraud-intelligence.jerrya-byte.workers.dev',          // e.g. 'https://ndis-fraud.yourusername.workers.dev'
+  WORKER_URL: '',          // e.g. 'https://ndis-fraud.yourusername.workers.dev'
   USE_MOCK: true,          // Auto-set to false when WORKER_URL is populated
   VERSION: '0.2.0'
 };
@@ -2099,10 +2133,44 @@ function showToast(type, msg) {
 }
 
 // ================================================================
+//  AUTH HELPERS
+// ================================================================
+function getAuthUser() {
+  try { return JSON.parse(sessionStorage.getItem('ndis_auth') || 'null'); }
+  catch { return null; }
+}
+
+function signOut() {
+  sessionStorage.removeItem('ndis_auth');
+  sessionStorage.removeItem('ndis_access_token');
+  window.location.href = './login.html';
+}
+
+function bootstrapUserUI() {
+  const auth = getAuthUser();
+  if (!auth) return;
+  const nameEl  = document.getElementById('headerUserName');
+  const emailEl = document.getElementById('headerUserEmail');
+  if (nameEl)  nameEl.textContent  = auth.name || auth.username;
+  if (emailEl) emailEl.textContent = auth.username || '';
+}
+
+// Attach access token to all Worker fetch calls
+const _origFetch = window.fetch;
+window.fetch = function(url, opts = {}) {
+  const token = sessionStorage.getItem('ndis_access_token');
+  if (token && typeof url === 'string' && url.includes('workers.dev')) {
+    opts.headers = { ...(opts.headers || {}), 'Authorization': `Bearer ${token}` };
+  }
+  return _origFetch(url, opts);
+};
+
+// ================================================================
 //  BOOT
 // ================================================================
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('overviewControls').style.display = 'flex';
+  bootstrapUserUI();
   loadData();
 });
 </script>
